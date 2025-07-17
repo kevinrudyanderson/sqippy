@@ -196,3 +196,6 @@ logs/
 *.bak
 *.orig
 /app/__pycache__
+app/__pycache__/main.cpython-310.pyc
+app/auth/__pycache__/dependencies.cpython-310.pyc
+app/auth/__pycache__/routers.cpython-310.pyc
