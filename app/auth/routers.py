@@ -28,7 +28,7 @@ async def create_staff_user(
     current_admin: User = Depends(require_admin),
     user_repo: UserRepository = Depends(get_user_repository),
 ):
-    print(current_admin)
+
     auth_service = AuthService(user_repo)
     user = auth_service.create_staff_user(staff_data)
     return UserResponse.model_validate(user)

@@ -7,6 +7,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.auth.routers import router as auth_router
 from app.database import Base, engine
+from app.locations.routers import router as location_router
+from app.queue.routers import router as queue_router
 
 load_dotenv()
 
@@ -41,3 +43,5 @@ app.add_middleware(
 )
 
 app.include_router(auth_router)
+app.include_router(queue_router)
+app.include_router(location_router)

@@ -55,7 +55,11 @@ async def require_staff_or_admin(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized"
         )
 
-    if current_user.role not in [UserRole.STAFF, UserRole.ADMIN]:
+    if current_user.role not in [
+        UserRole.STAFF,
+        UserRole.ADMIN,
+        UserRole.SUPER_ADMIN,
+    ]:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
 
     return current_user
