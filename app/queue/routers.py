@@ -36,7 +36,7 @@ async def create_queue(
 async def get_queue(
     queue_id: str, queue_service: QueueService = Depends(get_queue_service)
 ):
-    """Get queue details"""
+    """Get queue details (public endpoint)"""
     queue = queue_service.get_queue(queue_id)
     # Get customer counts
     waiting_customers = queue_service.customer_repo.get_waiting_customers(queue_id)
@@ -88,8 +88,57 @@ async def delete_queue(
 async def get_queues_by_location(
     location_id: str, queue_service: QueueService = Depends(get_queue_service)
 ):
-    """Get all queues for a location"""
+    """Get all queues for a location (public endpoint)"""
     queues = queue_service.get_queues_by_location(location_id)
+    response = []
+    for queue in queues:
+        waiting_customers = queue_service.customer_repo.get_waiting_customers(
+            queue.queue_id
+        )
+        in_service_customers = queue_service.customer_repo.get_queue_customers(
+            queue.queue_id, CustomerStatus.IN_SERVICE
+        )
+        response.append(
+            QueueResponse(
+                **queue.__dict__,
+                current_size=len(waiting_customers) + len(in_service_customers),
+                waiting_customers=len(waiting_customers)
+            )
+        )
+    return response
+
+
+@router.get("/service/{service_id}", response_model=List[QueueResponse])
+async def get_queues_by_service(
+    service_id: str, queue_service: QueueService = Depends(get_queue_service)
+):
+    """Get all queues for a service (public endpoint)"""
+    queues = queue_service.get_queues_by_service(service_id)
+    response = []
+    for queue in queues:
+        waiting_customers = queue_service.customer_repo.get_waiting_customers(
+            queue.queue_id
+        )
+        in_service_customers = queue_service.customer_repo.get_queue_customers(
+            queue.queue_id, CustomerStatus.IN_SERVICE
+        )
+        response.append(
+            QueueResponse(
+                **queue.__dict__,
+                current_size=len(waiting_customers) + len(in_service_customers),
+                waiting_customers=len(waiting_customers)
+            )
+        )
+    return response
+
+
+@router.get("/user/queues", response_model=List[QueueResponse])
+async def get_user_queues(
+    current_user: User = Depends(get_current_user),
+    queue_service: QueueService = Depends(get_queue_service),
+):
+    """Get all queues accessible to the logged in user"""
+    queues = queue_service.get_user_accessible_queues(current_user.user_id)
     response = []
     for queue in queues:
         waiting_customers = queue_service.customer_repo.get_waiting_customers(
@@ -120,7 +169,7 @@ async def add_customer_to_queue(
     current_user: Optional[User] = Depends(get_current_user),
     queue_service: QueueService = Depends(get_queue_service),
 ):
-    """Add a customer to the queue"""
+    """Add a customer to the queue (public endpoint - no authentication required)"""
     # If user is logged in, use their ID
     if current_user and not customer_data.user_id:
         customer_data.user_id = current_user.user_id
@@ -145,7 +194,7 @@ async def add_customer_to_queue(
 async def get_queue_status(
     queue_id: str, queue_service: QueueService = Depends(get_queue_service)
 ):
-    """Get current queue status and statistics"""
+    """Get current queue status and statistics (public endpoint)"""
     return queue_service.get_queue_status(queue_id)
 
 
@@ -186,7 +235,7 @@ async def get_queue_customers(
 async def get_customer_position(
     queue_customer_id: str, queue_service: QueueService = Depends(get_queue_service)
 ):
-    """Get a customer's current position in the queue"""
+    """Get a customer's current position in the queue (public endpoint)"""
     return queue_service.get_customer_position(queue_customer_id)
 
 
@@ -230,13 +279,23 @@ async def cancel_customer(
     queue_service: QueueService = Depends(get_queue_service),
 ):
     """Cancel a customer from the queue"""
-    # TODO: Add logic to allow customers to cancel their own entry
-    # For now, require staff/admin
-    if not current_user or current_user.role not in ["staff", "admin"]:
-        # In the future, check if current_user.user_id matches the queue customer
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions"
-        )
+    # Allow customers to cancel their own entry or staff/admin to cancel any
+    if current_user:
+        # If logged in, check if it's their own entry or they're staff/admin
+        customer = queue_service.get_queue_customer(queue_customer_id)
+        if not customer:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Customer not found"
+            )
+        
+        # Allow if it's their own entry or they're staff/admin
+        if (customer.user_id != current_user.user_id and 
+            current_user.role not in ["staff", "admin", "super_admin"]):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions"
+            )
+    # If not logged in, this is likely a public cancellation which we'll allow for now
+    # In production, you might want to require a phone number or other verification
 
     customer = queue_service.cancel_customer(queue_customer_id)
     return QueueCustomerResponse(

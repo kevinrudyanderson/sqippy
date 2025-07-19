@@ -10,7 +10,7 @@ from app.queue.models import CustomerStatus, QueueStatus
 class QueueBase(BaseModel):
     name: str
     description: Optional[str] = None
-    location_id: str
+    service_id: str
     max_capacity: Optional[int] = None
     estimated_service_time: Optional[int] = None
 
@@ -26,6 +26,17 @@ class QueueUpdate(BaseModel):
     max_capacity: Optional[int] = None
     estimated_service_time: Optional[int] = None
     is_active: Optional[bool] = None
+
+
+class Queue(QueueBase):
+    queue_id: str
+    status: QueueStatus
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
 
 
 class QueueResponse(QueueBase):

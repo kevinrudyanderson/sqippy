@@ -27,7 +27,7 @@ class UserRepository(BaseRepository[User]):
         return user
 
     def update_user(self, user_id: UUID, user_update: UserUpdate) -> User:
-        user = self.get_by_id(user_id)
+        user = self.get(user_id)
         if not user:
             raise ValueError("User not found")
         return self.update_from_schema(user, user_update)

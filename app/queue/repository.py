@@ -2,21 +2,33 @@ from datetime import datetime, timezone
 from typing import List, Optional
 
 from sqlalchemy.orm import Session
+from sqlalchemy import and_
 
 from app.base.repositories import BaseRepository
 from app.queue.models import CustomerStatus, Queue, QueueCustomer, QueueStatus
+from app.access.models import UserLocationAccess, AccessLevel
+from app.services.models import Service
+from app.locations.models import Location
+from app.organizations.models import Organization
+from app.auth.models import User
 
 
 class QueueRepository(BaseRepository[Queue]):
     def __init__(self, db: Session):
         super().__init__(db, Queue)
     
-    def get_by_id(self, queue_id: str) -> Optional[Queue]:
-        return self.db.query(Queue).filter(Queue.queue_id == queue_id).first()
+    def get_by_service(self, service_id: str) -> List[Queue]:
+        return self.db.query(Queue).filter(
+            Queue.service_id == service_id,
+            Queue.is_active == True
+        ).all()
     
     def get_by_location(self, location_id: str) -> List[Queue]:
-        return self.db.query(Queue).filter(
-            Queue.location_id == location_id,
+        """Get all queues for a location through its services"""
+        return self.db.query(Queue).join(
+            Service, Queue.service_id == Service.service_id
+        ).filter(
+            Service.location_id == location_id,
             Queue.is_active == True
         ).all()
     
@@ -26,15 +38,68 @@ class QueueRepository(BaseRepository[Queue]):
             Queue.is_active == True
         ).all()
 
+    # Access-based methods (inherit access from service's location)
+    def check_user_access(self, user_id: str, queue_id: str, min_access_level: AccessLevel = AccessLevel.VIEWER) -> bool:
+        """Check if user has access to a queue through its service's location"""
+        return self.db.query(Queue).join(Service, Queue.service_id == Service.service_id).join(
+            UserLocationAccess, Service.location_id == UserLocationAccess.location_id
+        ).filter(
+            and_(
+                Queue.queue_id == queue_id,
+                UserLocationAccess.user_id == user_id,
+                UserLocationAccess.access_level >= min_access_level,
+                UserLocationAccess.is_active == True
+            )
+        ).first() is not None
+
+    def get_accessible_resources(self, user_id: str, min_access_level: AccessLevel = AccessLevel.VIEWER, skip: int = 0, limit: int = 100) -> List[Queue]:
+        """Get queues accessible to a user through their location access"""
+        return self.db.query(Queue).join(Service, Queue.service_id == Service.service_id).join(
+            UserLocationAccess, Service.location_id == UserLocationAccess.location_id
+        ).filter(
+            and_(
+                UserLocationAccess.user_id == user_id,
+                UserLocationAccess.access_level >= min_access_level,
+                UserLocationAccess.is_active == True,
+                Queue.is_active == True
+            )
+        ).offset(skip).limit(limit).all()
+
+    def get_accessible_resource(self, user_id: str, queue_id: str, min_access_level: AccessLevel = AccessLevel.VIEWER) -> Optional[Queue]:
+        """Get a specific queue if user has access to it through its service's location"""
+        return self.db.query(Queue).join(Service, Queue.service_id == Service.service_id).join(
+            UserLocationAccess, Service.location_id == UserLocationAccess.location_id
+        ).filter(
+            and_(
+                Queue.queue_id == queue_id,
+                UserLocationAccess.user_id == user_id,
+                UserLocationAccess.access_level >= min_access_level,
+                UserLocationAccess.is_active == True
+            )
+        ).first()
+
+    def get_organization_queues(self, user_id: str) -> List[Queue]:
+        """Get all active queues in the user's organization"""
+        return self.db.query(Queue).join(
+            Service, Queue.service_id == Service.service_id
+        ).join(
+            Location, Service.location_id == Location.location_id
+        ).join(
+            Organization, Location.organization_id == Organization.organization_id
+        ).join(
+            User, Organization.organization_id == User.organization_id
+        ).filter(
+            and_(
+                User.user_id == user_id,
+                Queue.is_active == True,
+                Queue.status == QueueStatus.ACTIVE
+            )
+        ).all()
+
 
 class QueueCustomerRepository(BaseRepository[QueueCustomer]):
     def __init__(self, db: Session):
         super().__init__(db, QueueCustomer)
-    
-    def get_by_id(self, queue_customer_id: str) -> Optional[QueueCustomer]:
-        return self.db.query(QueueCustomer).filter(
-            QueueCustomer.queue_customer_id == queue_customer_id
-        ).first()
     
     def add_customer_to_queue(self, customer: QueueCustomer) -> QueueCustomer:
         # No need to set position - joined_at is automatically set
@@ -58,7 +123,7 @@ class QueueCustomerRepository(BaseRepository[QueueCustomer]):
         return self.get_queue_customers(queue_id, CustomerStatus.WAITING)
     
     def get_customer_position(self, queue_customer_id: str) -> Optional[int]:
-        customer = self.get_by_id(queue_customer_id)
+        customer = self.get(queue_customer_id)
         if not customer or customer.status != CustomerStatus.WAITING:
             return None
         
@@ -87,7 +152,7 @@ class QueueCustomerRepository(BaseRepository[QueueCustomer]):
         return next_customer
     
     def complete_customer(self, queue_customer_id: str) -> Optional[QueueCustomer]:
-        customer = self.get_by_id(queue_customer_id)
+        customer = self.get(queue_customer_id)
         if customer and customer.status == CustomerStatus.IN_SERVICE:
             customer.status = CustomerStatus.COMPLETED
             customer.completed_at = datetime.now(timezone.utc)
@@ -97,7 +162,7 @@ class QueueCustomerRepository(BaseRepository[QueueCustomer]):
         return None
     
     def cancel_customer(self, queue_customer_id: str) -> Optional[QueueCustomer]:
-        customer = self.get_by_id(queue_customer_id)
+        customer = self.get(queue_customer_id)
         if customer and customer.status in [CustomerStatus.WAITING, CustomerStatus.IN_SERVICE]:
             customer.status = CustomerStatus.CANCELLED
             customer.completed_at = datetime.now(timezone.utc)

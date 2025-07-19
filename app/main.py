@@ -8,7 +8,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.auth.routers import router as auth_router
 from app.database import Base, engine
 from app.locations.routers import router as location_router
+from app.organizations.routers import router as organization_router
 from app.queue.routers import router as queue_router
+from app.services.routers import router as services_router
+# from app.access.routers import router as access_router  # Temporarily disabled
+
+# Import models to ensure they're registered with SQLAlchemy
+# from app.access import models as access_models  # noqa: F401  # Temporarily disabled
+from app.organizations import models as organization_models  # noqa: F401
 
 load_dotenv()
 
@@ -43,5 +50,8 @@ app.add_middleware(
 )
 
 app.include_router(auth_router)
-app.include_router(queue_router)
 app.include_router(location_router)
+app.include_router(organization_router)
+app.include_router(services_router)
+app.include_router(queue_router)
+# app.include_router(access_router)  # Temporarily disabled

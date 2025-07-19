@@ -26,6 +26,19 @@ class CustomerSignUp(BaseModel):
         return v
 
 
+class UserRegistration(BaseModel):
+    """Registration for business owners/managers"""
+    
+    name: str = Field(min_length=2, max_length=100)
+    email: EmailStr
+    phone_number: Optional[str] = Field(default=None, pattern=r"^\+?[1-9]\d{1,14}$")
+    password: str = Field(min_length=8)
+    
+    # Business/location info (optional, can be added later)
+    business_name: Optional[str] = Field(default=None, max_length=200)
+    business_type: Optional[str] = Field(default=None, max_length=100)
+
+
 class StaffLogin(BaseModel):
     """Login for staff"""
 

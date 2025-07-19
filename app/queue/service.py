@@ -29,7 +29,7 @@ class QueueService:
         return self.queue_repo.create(queue)
     
     def get_queue(self, queue_id: str) -> Queue:
-        queue = self.queue_repo.get_by_id(queue_id)
+        queue = self.queue_repo.get(queue_id)
         if not queue:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -60,6 +60,12 @@ class QueueService:
     
     def get_queues_by_location(self, location_id: str) -> List[Queue]:
         return self.queue_repo.get_by_location(location_id)
+    
+    def get_queues_by_service(self, service_id: str) -> List[Queue]:
+        return self.queue_repo.get_by_service(service_id)
+    
+    def get_queue_customer(self, queue_customer_id: str) -> Optional[QueueCustomer]:
+        return self.customer_repo.get(queue_customer_id)
     
     def add_customer_to_queue(
         self, 
@@ -124,7 +130,7 @@ class QueueService:
         )
     
     def get_customer_position(self, queue_customer_id: str) -> QueuePositionResponse:
-        customer = self.customer_repo.get_by_id(queue_customer_id)
+        customer = self.customer_repo.get(queue_customer_id)
         if not customer:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -138,7 +144,7 @@ class QueueService:
                 detail="Customer is not in waiting status"
             )
         
-        queue = self.queue_repo.get_by_id(customer.queue_id)
+        queue = self.queue_repo.get(customer.queue_id)
         estimated_wait_time = None
         if queue.estimated_service_time and position > 0:
             estimated_wait_time = queue.estimated_service_time * (position - 1)
@@ -179,3 +185,7 @@ class QueueService:
     ) -> List[QueueCustomer]:
         self.get_queue(queue_id)  # Verify queue exists
         return self.customer_repo.get_queue_customers(queue_id, status)
+    
+    def get_user_accessible_queues(self, user_id: str) -> List[Queue]:
+        """Get all active queues in the user's organization"""
+        return self.queue_repo.get_organization_queues(user_id)

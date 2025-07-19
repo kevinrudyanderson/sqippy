@@ -14,4 +14,4 @@ class LocationService:
         return self.location_repo.create(Location(**location.model_dump()))
 
     def get_location(self, location_id: str) -> Location:
-        return self.location_repo.get_by_id(location_id)
+        return self.location_repo.get(location_id)

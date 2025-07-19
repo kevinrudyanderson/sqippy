@@ -32,8 +32,8 @@ class Queue(Base):
     name = Column(String, nullable=False)
     description = Column(String, nullable=True)
     
-    # Foreign key to location
-    location_id = Column(String, ForeignKey("locations.location_id"), nullable=False)
+    # Foreign key to service
+    service_id = Column(String, ForeignKey("services.service_id"), nullable=False)
     
     status = Column(Enum(QueueStatus), default=QueueStatus.ACTIVE, nullable=False)
     
@@ -51,7 +51,7 @@ class Queue(Base):
     )
 
     # Relationships
-    location = relationship("Location", back_populates="queues")
+    service = relationship("Service", back_populates="queues")
     customers = relationship("QueueCustomer", back_populates="queue", order_by="QueueCustomer.joined_at")
 
 

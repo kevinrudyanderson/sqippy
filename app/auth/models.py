@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from sqlalchemy import UUID, Boolean, Column, DateTime, Enum, String
+from sqlalchemy import UUID, Boolean, Column, DateTime, Enum, String, ForeignKey
 from sqlalchemy.orm import relationship
 
 from app.auth.roles import UserRole
@@ -14,6 +14,9 @@ class User(Base):
     # TODO: Remove this once we use postgres
     # user_id = Column(UUID, primary_key=True, default=uuid4)
     user_id = Column(String, primary_key=True, default=lambda: str(uuid4()))
+
+    # Organization relationship
+    organization_id = Column(String, ForeignKey("organizations.organization_id"), nullable=True)
 
     name = Column(String, nullable=False)
 
@@ -38,6 +41,8 @@ class User(Base):
         onupdate=lambda: datetime.now(timezone.utc),
     )
 
+    # Relationships
+    organization = relationship("Organization", back_populates="users")
     # queue_entries = relationship("QueueEntry", back_populates="user")
 
     @property
