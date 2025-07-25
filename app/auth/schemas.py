@@ -82,6 +82,14 @@ class TokenResponse(BaseModel):
     expires_in: int
 
 
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str
+
+
+class LogoutRequest(BaseModel):
+    refresh_token: str
+
+
 class UserUpdate(BaseModel):
     name: Optional[str] = Field(default=None)
     email: Optional[EmailStr] = Field(default=None)

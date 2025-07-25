@@ -52,3 +52,22 @@ class User(Base):
     @property
     def needs_password(self) -> bool:
         return self.role in [UserRole.STAFF, UserRole.ADMIN]
+
+
+class RefreshToken(Base):
+    __tablename__ = "refresh_tokens"
+
+    # TODO: Remove this once we use postgres
+    token_id = Column(String, primary_key=True, default=lambda: str(uuid4()))
+    
+    user_id = Column(String, ForeignKey("users.user_id"), nullable=False)
+    token = Column(String, unique=True, nullable=False, index=True)
+    
+    expires_at = Column(DateTime, nullable=False)
+    is_revoked = Column(Boolean, default=False)
+    
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    revoked_at = Column(DateTime, nullable=True)
+    
+    # Relationships
+    user = relationship("User", backref="refresh_tokens")
