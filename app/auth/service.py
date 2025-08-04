@@ -138,7 +138,7 @@ class AuthService:
         
         return None
 
-    def authenticate_staff(self, email: str, password: str) -> User:
+    def authenticate_staff(self, email: str, password: str) -> tuple[TokenResponse, str]:
         user = self.user_repository.get_by_email(email)
         if not user:
             raise HTTPException(
@@ -152,11 +152,14 @@ class AuthService:
             )
 
         access_token = self.create_access_token(user)
+        refresh_token = self.create_refresh_token(user)
 
-        return TokenResponse(
+        token_response = TokenResponse(
             access_token=access_token,
             expires_in=self.access_token_expire_minutes,
         )
+        
+        return token_response, refresh_token
 
     def create_staff_user(self, staff_create: StaffCreate) -> User:
         existing_user = self.user_repository.get_by_email(staff_create.email)
