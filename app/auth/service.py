@@ -1,5 +1,6 @@
 import os
 import secrets
+import hashlib
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -55,12 +56,12 @@ class AuthService:
         token = secrets.token_urlsafe(32)
         expires_at = datetime.now(timezone.utc) + timedelta(days=self.refresh_token_expire_days)
         
-        # Hash the token before storing in database
-        hashed_token = self.hash_password(token)
+        # Hash the token with SHA-256 for fast lookups
+        token_hash = hashlib.sha256(token.encode()).hexdigest()
         
         refresh_token = RefreshToken(
             user_id=user.user_id,
-            token=hashed_token,
+            token=token_hash,
             expires_at=expires_at
         )
         
@@ -71,17 +72,20 @@ class AuthService:
 
     def invalidate_refresh_token(self, token: str) -> bool:
         """Invalidate a refresh token by marking it as revoked"""
-        # Get all non-revoked tokens and check hash
-        refresh_tokens = self.db_session.query(RefreshToken).filter(
-            RefreshToken.is_revoked == False
-        ).all()
+        # Hash the token for lookup
+        token_hash = hashlib.sha256(token.encode()).hexdigest()
         
-        for refresh_token in refresh_tokens:
-            if self.verify_password(token, refresh_token.token):
-                refresh_token.is_revoked = True
-                refresh_token.revoked_at = datetime.now(timezone.utc)
-                self.db_session.commit()
-                return True
+        # Direct lookup by hash - O(1) operation
+        refresh_token = self.db_session.query(RefreshToken).filter(
+            RefreshToken.token == token_hash,
+            RefreshToken.is_revoked == False
+        ).first()
+        
+        if refresh_token:
+            refresh_token.is_revoked = True
+            refresh_token.revoked_at = datetime.now(timezone.utc)
+            self.db_session.commit()
+            return True
         
         return False
 
@@ -103,40 +107,48 @@ class AuthService:
 
     def is_refresh_token_valid(self, token: str) -> bool:
         """Check if a refresh token is valid (exists, not revoked, not expired)"""
-        # Get all tokens and check hash
-        refresh_tokens = self.db_session.query(RefreshToken).all()
+        # Hash the token for lookup
+        token_hash = hashlib.sha256(token.encode()).hexdigest()
         
-        for refresh_token in refresh_tokens:
-            if self.verify_password(token, refresh_token.token):
-                if refresh_token.is_revoked:
-                    return False
-                
-                if refresh_token.expires_at < datetime.now(timezone.utc):
-                    # Auto-expire the token
-                    refresh_token.is_revoked = True
-                    refresh_token.revoked_at = datetime.now(timezone.utc)
-                    self.db_session.commit()
-                    return False
-                
-                return True
+        # Direct lookup by hash - O(1) operation
+        refresh_token = self.db_session.query(RefreshToken).filter(
+            RefreshToken.token == token_hash,
+            RefreshToken.is_revoked == False
+        ).first()
         
-        return False
+        if not refresh_token:
+            return False
+        
+        # Check expiration
+        now = datetime.now()
+        now_utc = datetime.now(timezone.utc)
+        expires_at = refresh_token.expires_at
+        comparison_time = now if expires_at.tzinfo is None else now_utc
+        
+        if expires_at < comparison_time:
+            # Auto-expire the token
+            refresh_token.is_revoked = True
+            refresh_token.revoked_at = now if expires_at.tzinfo is None else now_utc
+            self.db_session.commit()
+            return False
+        
+        return True
 
     def get_user_from_refresh_token(self, token: str) -> Optional[User]:
         """Get user associated with a valid refresh token"""
         if not self.is_refresh_token_valid(token):
             return None
         
-        # Find the matching token by hash
-        refresh_tokens = self.db_session.query(RefreshToken).filter(
+        # Hash the token for lookup
+        token_hash = hashlib.sha256(token.encode()).hexdigest()
+        
+        # Direct lookup by hash - O(1) operation
+        refresh_token = self.db_session.query(RefreshToken).filter(
+            RefreshToken.token == token_hash,
             RefreshToken.is_revoked == False
-        ).all()
+        ).first()
         
-        for refresh_token in refresh_tokens:
-            if self.verify_password(token, refresh_token.token):
-                return refresh_token.user
-        
-        return None
+        return refresh_token.user if refresh_token else None
 
     def authenticate_staff(self, email: str, password: str) -> tuple[TokenResponse, str]:
         user = self.user_repository.get_by_email(email)

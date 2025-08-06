@@ -42,7 +42,7 @@ class User(Base):
     )
 
     # Relationships
-    organization = relationship("Organization", back_populates="users")
+    organization = relationship("Organization", back_populates="users", lazy="select")
     # queue_entries = relationship("QueueEntry", back_populates="user")
 
     @property

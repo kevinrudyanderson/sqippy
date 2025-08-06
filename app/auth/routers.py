@@ -19,12 +19,7 @@ from app.organizations.models import Organization
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-@router.post("/login")
-def login():
-    return {"message": "Login successful"}
-
-
-@router.post("/staff/login", response_model=TokenResponse)
+@router.post("/login", response_model=TokenResponse)
 async def staff_login(
     login_data: StaffLogin,
     response: Response,
@@ -45,8 +40,8 @@ async def staff_login(
         * 60
         * 60,  # Convert days to seconds
         httponly=True,
-        secure=True,  # Only send over HTTPS
-        samesite="strict",
+        secure=False,  # False for localhost development
+        samesite="lax",  # More permissive for same-site requests
     )
 
     return token_response
@@ -117,12 +112,14 @@ async def refresh_token(
 
     # Get refresh token from cookie
     refresh_token = request.cookies.get("refresh_token")
+
     if not refresh_token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Refresh token not found",
         )
 
+    # Get user from refresh token (this also validates the token)
     user = auth_service.get_user_from_refresh_token(refresh_token)
     if not user:
         raise HTTPException(
@@ -143,8 +140,8 @@ async def refresh_token(
         value=new_refresh_token,
         max_age=auth_service.refresh_token_expire_days * 24 * 60 * 60,
         httponly=True,
-        secure=True,
-        samesite="strict",
+        secure=False,
+        samesite="lax",
     )
 
     return TokenResponse(
@@ -170,7 +167,7 @@ async def logout(
 
     # Clear the refresh token cookie
     response.delete_cookie(
-        key="refresh_token", httponly=True, secure=True, samesite="strict"
+        key="refresh_token", httponly=True, secure=False, samesite="lax"
     )
 
     return {"message": "Logged out successfully"}
@@ -190,7 +187,7 @@ async def logout_all_devices(
 
     # Clear the refresh token cookie from current device
     response.delete_cookie(
-        key="refresh_token", httponly=True, secure=True, samesite="strict"
+        key="refresh_token", httponly=True, secure=False, samesite="lax"
     )
 
     return {"message": f"Logged out from {count} devices"}

@@ -197,3 +197,4 @@ logs/
 *.orig
 **/__pycache__/
 
+/app/auth/__pycache__
