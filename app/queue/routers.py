@@ -16,6 +16,8 @@ from app.queue.schemas import (
     QueueResponse,
     QueueStatusResponse,
     QueueUpdate,
+    QueueWizardRequest,
+    QueueWizardResponse,
 )
 from app.queue.service import QueueService
 
@@ -32,6 +34,16 @@ async def create_queue(
     """Create a new queue (Staff/Admin only)"""
     queue = queue_service.create_queue(queue_data)
     return QueueResponse(**queue.__dict__, current_size=0, waiting_customers=0)
+
+
+@router.post("/wizard", response_model=QueueWizardResponse, status_code=status.HTTP_201_CREATED)
+async def create_queue_wizard(
+    wizard_data: QueueWizardRequest,
+    current_user: User = Depends(require_staff_or_admin),
+    queue_service: QueueService = Depends(get_queue_service),
+):
+    """Create queue, service, and location in one operation (Wizard endpoint)"""
+    return queue_service.create_queue_wizard(wizard_data, current_user.user_id)
 
 
 @router.get("/{queue_id}", response_model=QueueResponse)

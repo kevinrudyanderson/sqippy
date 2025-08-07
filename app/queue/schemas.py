@@ -131,3 +131,76 @@ class QueueStatusResponse(BaseModel):
     waiting_customers: int
     average_wait_time: Optional[int] = None
     is_accepting_customers: bool
+
+
+# Wizard schemas for creating queue + service + location  
+class WizardNewService(BaseModel):
+    name: str
+    description: Optional[str] = None
+    category: Optional[str] = None
+    duration_minutes: Optional[int] = None  # This matches ServiceBase
+    price: Optional[float] = None
+    is_active: bool = True
+    max_daily_capacity: Optional[int] = None
+
+
+class WizardServiceConfig(BaseModel):
+    useExisting: bool
+    existingServiceId: Optional[str] = None
+    newService: Optional[WizardNewService] = None
+
+
+class WizardNewLocation(BaseModel):
+    name: str
+    address: Optional[str] = None
+    city: Optional[str] = None
+    province: Optional[str] = None
+    postal_code: Optional[str] = None
+    country: Optional[str] = "NL"
+    longitude: Optional[float] = None
+    latitude: Optional[float] = None
+
+
+class WizardLocationConfig(BaseModel):
+    useExisting: bool
+    existingLocationId: Optional[str] = None
+    newLocation: Optional[WizardNewLocation] = None
+
+
+class WizardQueueConfig(BaseModel):
+    name: str
+    description: Optional[str] = None
+    max_capacity: Optional[int] = None
+    estimated_service_time: Optional[int] = None
+
+
+class QueueWizardRequest(BaseModel):
+    queue: WizardQueueConfig
+    service: WizardServiceConfig
+    location: WizardLocationConfig
+    
+    def model_validate(cls, v):
+        # Validate service config
+        if v.service.useExisting and not v.service.existingServiceId:
+            raise ValueError("existingServiceId is required when useExisting is true for service")
+        if not v.service.useExisting and not v.service.newService:
+            raise ValueError("newService data is required when useExisting is false for service")
+        
+        # Validate location config  
+        if v.location.useExisting and not v.location.existingLocationId:
+            raise ValueError("existingLocationId is required when useExisting is true for location")
+        if not v.location.useExisting and not v.location.newLocation:
+            raise ValueError("newLocation data is required when useExisting is false for location")
+        
+        return v
+
+
+class QueueWizardResponse(BaseModel):
+    queue_id: str
+    queue_name: str
+    service_id: str
+    service_name: str
+    location_id: str
+    location_name: str
+    created_new_service: bool
+    created_new_location: bool

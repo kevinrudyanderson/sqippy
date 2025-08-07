@@ -12,7 +12,16 @@ from app.queue.schemas import (
     QueueResponse,
     QueueStatusResponse,
     QueueUpdate,
+    QueueWizardRequest,
+    QueueWizardResponse,
 )
+from app.locations.models import Location
+from app.locations.repository import LocationRepository
+from app.locations.schemas import AddLocationRequest
+from app.services.models import Service
+from app.services.repository import ServiceRepository
+from app.services.schemas import ServiceCreate
+from app.auth.repository import UserRepository
 
 
 class QueueService:
@@ -20,6 +29,9 @@ class QueueService:
         self.db = db
         self.queue_repo = QueueRepository(db)
         self.customer_repo = QueueCustomerRepository(db)
+        self.location_repo = LocationRepository(db)
+        self.service_repo = ServiceRepository(db)
+        self.user_repo = UserRepository(db)
     
     def create_queue(self, queue_data: QueueCreate) -> Queue:
         # Verify location exists (would need location repository)
@@ -232,3 +244,102 @@ class QueueService:
     def get_user_accessible_queues(self, user_id: str) -> List[Queue]:
         """Get all active queues in the user's organization"""
         return self.queue_repo.get_organization_queues(user_id)
+    
+    def create_queue_wizard(self, wizard_data: QueueWizardRequest, user_id: str) -> QueueWizardResponse:
+        """Create queue, service, and location in one operation (wizard)"""
+        created_new_location = False
+        created_new_service = False
+        
+        # Get user's organization
+        user = self.user_repo.get(user_id)
+        if not user or not user.organization_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="User must belong to an organization to create queues"
+            )
+        
+        try:
+            # Handle location
+            if wizard_data.location.useExisting:
+                if not wizard_data.location.existingLocationId:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Existing location ID is required when useExisting is true"
+                    )
+                location = self.location_repo.get(wizard_data.location.existingLocationId)
+                if not location:
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail="Existing location not found"
+                    )
+            else:
+                if not wizard_data.location.newLocation:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="New location data is required when useExisting is false"
+                    )
+                # Create new location
+                location = Location(
+                    organization_id=user.organization_id,
+                    **wizard_data.location.newLocation.model_dump()
+                )
+                location = self.location_repo.create(location)
+                created_new_location = True
+        
+            # Handle service
+            if wizard_data.service.useExisting:
+                if not wizard_data.service.existingServiceId:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Existing service ID is required when useExisting is true"
+                    )
+                service = self.service_repo.get(wizard_data.service.existingServiceId)
+                if not service:
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail="Existing service not found"
+                    )
+            else:
+                if not wizard_data.service.newService:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="New service data is required when useExisting is false"
+                    )
+                # Create new service
+                service = Service(
+                    location_id=location.location_id,
+                    **wizard_data.service.newService.model_dump()
+                )
+                service = self.service_repo.create(service)
+                created_new_service = True
+            
+            # Create queue
+            queue = Queue(
+                service_id=service.service_id,
+                name=wizard_data.queue.name,
+                description=wizard_data.queue.description,
+                max_capacity=wizard_data.queue.max_capacity,
+                estimated_service_time=wizard_data.queue.estimated_service_time,
+            )
+            queue = self.queue_repo.create(queue)
+        
+            # Commit the transaction
+            self.db.commit()
+            
+            return QueueWizardResponse(
+                queue_id=queue.queue_id,
+                queue_name=queue.name,
+                service_id=service.service_id,
+                service_name=service.name,
+                location_id=location.location_id,
+                location_name=location.name,
+                created_new_service=created_new_service,
+                created_new_location=created_new_location,
+            )
+        except Exception as e:
+            # Rollback on any error
+            self.db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to create queue wizard: {str(e)}"
+            )
