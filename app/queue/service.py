@@ -137,23 +137,66 @@ class QueueService:
                 detail="Customer not found in queue"
             )
         
-        position = self.customer_repo.get_customer_position(queue_customer_id)
-        if position is None:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Customer is not in waiting status"
-            )
-        
         queue = self.queue_repo.get(customer.queue_id)
-        estimated_wait_time = None
-        if queue.estimated_service_time and position > 0:
-            estimated_wait_time = queue.estimated_service_time * (position - 1)
+        
+        # Handle different customer statuses
+        if customer.status == CustomerStatus.WAITING:
+            position = self.customer_repo.get_customer_position(queue_customer_id)
+            ahead_in_queue = position - 1 if position else 0
+            estimated_wait_time = None
+            if queue.estimated_service_time and position and position > 0:
+                estimated_wait_time = queue.estimated_service_time * (position - 1)
+            status_message = f"You are #{position} in line. {ahead_in_queue} people ahead of you."
+        elif customer.status == CustomerStatus.IN_SERVICE:
+            position = None
+            ahead_in_queue = None  
+            estimated_wait_time = 0
+            status_message = "You have been called! It's your turn - please proceed to the service area."
+        elif customer.status == CustomerStatus.COMPLETED:
+            position = None
+            ahead_in_queue = None
+            estimated_wait_time = None
+            status_message = "Your service has been completed. Thank you!"
+        elif customer.status == CustomerStatus.CANCELLED:
+            position = None
+            ahead_in_queue = None
+            estimated_wait_time = None
+            status_message = "Your queue entry has been cancelled."
+        elif customer.status == CustomerStatus.NO_SHOW:
+            position = None
+            ahead_in_queue = None
+            estimated_wait_time = None
+            status_message = "You were called but did not respond. Your queue entry has been marked as no-show."
+        else:
+            position = None
+            ahead_in_queue = None
+            estimated_wait_time = None
+            status_message = f"Your current status: {customer.status.value}"
+        
+        # Get customer info from registered user if available
+        customer_name = customer.customer_name
+        customer_email = customer.customer_email  
+        customer_phone = customer.customer_phone
+        
+        # If customer is a registered user, use their profile info as fallback
+        if customer.user_id and customer.user:
+            customer_name = customer_name or customer.user.name
+            customer_email = customer_email or customer.user.email
+            customer_phone = customer_phone or customer.user.phone_number
         
         return QueuePositionResponse(
             queue_customer_id=queue_customer_id,
             position=position,
-            ahead_in_queue=position - 1,
-            estimated_wait_time=estimated_wait_time
+            ahead_in_queue=ahead_in_queue,
+            estimated_wait_time=estimated_wait_time,
+            status=customer.status.value,
+            status_message=status_message,
+            customer_name=customer_name,
+            customer_email=customer_email,
+            customer_phone=customer_phone,
+            party_size=customer.party_size,
+            queue_name=queue.name,
+            queue_id=queue.queue_id
         )
     
     def call_next_customer(self, queue_id: str) -> Optional[QueueCustomer]:

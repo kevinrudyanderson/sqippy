@@ -11,6 +11,7 @@ from app.locations.routers import router as location_router
 from app.organizations.routers import router as organization_router
 from app.queue.routers import router as queue_router
 from app.services.routers import router as services_router
+from app.users.routers import router as users_router
 # from app.access.routers import router as access_router  # Temporarily disabled
 
 # Import models to ensure they're registered with SQLAlchemy (order matters for relationships)
@@ -58,4 +59,5 @@ app.include_router(location_router)
 app.include_router(organization_router)
 app.include_router(services_router)
 app.include_router(queue_router)
+app.include_router(users_router)
 # app.include_router(access_router)  # Temporarily disabled

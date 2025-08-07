@@ -2,8 +2,10 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.auth.dependencies import get_current_user, require_authenticated_user, require_staff_or_admin
+from app.auth.dependencies import get_current_user, require_authenticated_user, require_staff_or_admin, get_user_repository
 from app.auth.models import User
+from app.auth.repository import UserRepository
+from app.auth.schemas import CustomerSignUp
 from app.queue.dependencies import get_queue_service
 from app.queue.models import CustomerStatus
 from app.queue.schemas import (
@@ -168,11 +170,22 @@ async def add_customer_to_queue(
     customer_data: AddCustomerToQueueRequest,
     current_user: Optional[User] = Depends(get_current_user),
     queue_service: QueueService = Depends(get_queue_service),
+    user_repo: UserRepository = Depends(get_user_repository),
 ):
     """Add a customer to the queue (public endpoint - no authentication required)"""
     # If user is logged in, use their ID
     if current_user and not customer_data.user_id:
         customer_data.user_id = current_user.user_id
+    elif not current_user and not customer_data.user_id:
+        # Create customer account if email or phone is provided
+        if customer_data.customer_email or customer_data.customer_phone:
+            customer_signup = CustomerSignUp(
+                name=customer_data.customer_name,
+                email=customer_data.customer_email,
+                phone_number=customer_data.customer_phone
+            )
+            user = user_repo.get_or_create_customer(customer_signup)
+            customer_data.user_id = user.user_id
 
     customer = queue_service.add_customer_to_queue(queue_id, customer_data)
 

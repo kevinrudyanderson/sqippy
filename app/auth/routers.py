@@ -6,6 +6,7 @@ from app.auth.models import User
 from app.auth.repository import UserRepository
 from app.auth.roles import UserRole
 from app.auth.schemas import (
+    CustomerSignUp,
     StaffCreate,
     StaffLogin,
     TokenResponse,
@@ -84,6 +85,29 @@ def register_user(
     )
 
     user = user_repo.create(user_data)
+    return UserResponse.model_validate(user)
+
+
+@router.post("/customer/signup", response_model=UserResponse)
+async def customer_signup(
+    customer_data: CustomerSignUp,
+    db: Session = Depends(get_db),
+    user_repo: UserRepository = Depends(get_user_repository),
+):
+    """Customer signup for queue access"""
+    # Check if email is provided and already exists
+    if customer_data.email:
+        existing_user = user_repo.get_by_email(customer_data.email)
+        if existing_user:
+            return UserResponse.model_validate(existing_user)
+    
+    # Check if phone is provided and already exists  
+    if customer_data.phone_number:
+        existing_user = user_repo.get_by_phone(customer_data.phone_number)
+        if existing_user:
+            return UserResponse.model_validate(existing_user)
+
+    user = user_repo.get_or_create_customer(customer_data)
     return UserResponse.model_validate(user)
 
 

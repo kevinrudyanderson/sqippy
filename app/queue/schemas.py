@@ -104,9 +104,23 @@ class AddCustomerToQueueRequest(BaseModel):
 
 class QueuePositionResponse(BaseModel):
     queue_customer_id: str
-    position: int
-    ahead_in_queue: int
+    position: Optional[int] = None  # Null when not waiting
+    ahead_in_queue: Optional[int] = None  # Null when not waiting
     estimated_wait_time: Optional[int] = None
+    
+    # Status information
+    status: str  # "waiting", "in_service", "completed", "cancelled", "no_show"
+    status_message: str  # Human-readable status message
+    
+    # Customer information
+    customer_name: Optional[str] = None
+    customer_email: Optional[str] = None
+    customer_phone: Optional[str] = None
+    party_size: int = 1
+    
+    # Queue information
+    queue_name: str
+    queue_id: str
 
 
 class QueueStatusResponse(BaseModel):
