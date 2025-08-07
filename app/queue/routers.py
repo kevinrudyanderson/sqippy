@@ -2,7 +2,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.auth.dependencies import get_current_user, require_staff_or_admin
+from app.auth.dependencies import get_current_user, require_authenticated_user, require_staff_or_admin
 from app.auth.models import User
 from app.queue.dependencies import get_queue_service
 from app.queue.models import CustomerStatus
@@ -134,7 +134,7 @@ async def get_queues_by_service(
 
 @router.get("/user/queues", response_model=List[QueueResponse])
 async def get_user_queues(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_authenticated_user),
     queue_service: QueueService = Depends(get_queue_service),
 ):
     """Get all queues accessible to the logged in user"""

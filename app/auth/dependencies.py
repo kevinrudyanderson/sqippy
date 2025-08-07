@@ -38,7 +38,15 @@ async def get_current_user(
             )
 
         user = user_repository.get_by_email(user_id)
-        return user if user and user.is_active else None
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found"
+            )
+        if not user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail="User account is inactive"
+            )
+        return user
 
     except jwt.InvalidTokenError:
         raise HTTPException(
@@ -62,6 +70,16 @@ async def require_staff_or_admin(
     ]:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
 
+    return current_user
+
+
+async def require_authenticated_user(
+    current_user: Optional[User] = Depends(get_current_user),
+) -> User:
+    if not current_user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required"
+        )
     return current_user
 
 
