@@ -36,13 +36,12 @@ async def staff_login(
     response.set_cookie(
         key="refresh_token",
         value=refresh_token,
-        max_age=auth_service.refresh_token_expire_days
-        * 24
-        * 60
-        * 60,  # Convert days to seconds
+        max_age=auth_service.refresh_token_expire_days * 24 * 60 * 60,
         httponly=True,
         secure=False,  # False for localhost development
-        samesite="lax",  # More permissive for same-site requests
+        # samesite removed for cross-port compatibility in development
+        path="/",
+        # domain not set - browser will use the exact domain of the request
     )
 
     return token_response
@@ -165,7 +164,9 @@ async def refresh_token(
         max_age=auth_service.refresh_token_expire_days * 24 * 60 * 60,
         httponly=True,
         secure=False,
-        samesite="lax",
+        # samesite removed for cross-port compatibility in development
+        path="/",
+        # domain not set - browser will use the exact domain of the request
     )
 
     return TokenResponse(
@@ -191,7 +192,9 @@ async def logout(
 
     # Clear the refresh token cookie
     response.delete_cookie(
-        key="refresh_token", httponly=True, secure=False, samesite="lax"
+        key="refresh_token", 
+        path="/",
+        # domain not set - browser will use the exact domain of the request
     )
 
     return {"message": "Logged out successfully"}
@@ -211,7 +214,9 @@ async def logout_all_devices(
 
     # Clear the refresh token cookie from current device
     response.delete_cookie(
-        key="refresh_token", httponly=True, secure=False, samesite="lax"
+        key="refresh_token", 
+        path="/",
+        # domain not set - browser will use the exact domain of the request
     )
 
     return {"message": f"Logged out from {count} devices"}

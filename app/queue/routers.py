@@ -7,6 +7,7 @@ from app.auth.models import User
 from app.auth.repository import UserRepository
 from app.auth.schemas import CustomerSignUp
 from app.queue.dependencies import get_queue_service
+from app.subscriptions.dependencies import check_queue_limit
 from app.queue.models import CustomerStatus
 from app.queue.schemas import (
     AddCustomerToQueueRequest,
@@ -29,9 +30,18 @@ router = APIRouter(prefix="/queues", tags=["queues"])
 async def create_queue(
     queue_data: QueueCreate,
     current_user: User = Depends(require_staff_or_admin),
+    _: User = Depends(check_queue_limit),  # Check subscription limits
     queue_service: QueueService = Depends(get_queue_service),
 ):
     """Create a new queue (Staff/Admin only)"""
+    # Track queue creation in usage
+    from app.database import get_db
+    from app.subscriptions.service import SubscriptionService
+    
+    db = next(get_db())
+    subscription_service = SubscriptionService(db)
+    subscription_service.track_queue_created(current_user.organization_id)
+    
     queue = queue_service.create_queue(queue_data)
     return QueueResponse(**queue.__dict__, current_size=0, waiting_customers=0)
 
@@ -40,9 +50,18 @@ async def create_queue(
 async def create_queue_wizard(
     wizard_data: QueueWizardRequest,
     current_user: User = Depends(require_staff_or_admin),
+    _: User = Depends(check_queue_limit),  # Check subscription limits
     queue_service: QueueService = Depends(get_queue_service),
 ):
     """Create queue, service, and location in one operation (Wizard endpoint)"""
+    # Track queue creation in usage
+    from app.database import get_db
+    from app.subscriptions.service import SubscriptionService
+    
+    db = next(get_db())
+    subscription_service = SubscriptionService(db)
+    subscription_service.track_queue_created(current_user.organization_id)
+    
     return queue_service.create_queue_wizard(wizard_data, current_user.user_id)
 
 

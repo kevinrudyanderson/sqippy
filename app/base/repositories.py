@@ -47,10 +47,16 @@ class BaseRepository(ABC, Generic[T]):
     def update_from_schema(self, obj: T, update_schema: BaseModel) -> T:
         """
         Update an object from a Pydantic schema, only setting fields that are not None.
+        IMPORTANT: Only updates fields that are explicitly defined in the schema.
         """
         update_data = update_schema.model_dump(exclude_unset=True)
+        
+        # Get the fields defined in the schema model
+        schema_fields = set(update_schema.__class__.model_fields.keys())
+        
         for field, value in update_data.items():
-            if hasattr(obj, field):
+            # Only update if field is defined in the schema AND exists on the object
+            if field in schema_fields and hasattr(obj, field):
                 setattr(obj, field, value)
         return self.update(obj)
 

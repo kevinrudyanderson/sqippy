@@ -44,8 +44,12 @@ class UserRepository(BaseRepository[User]):
         if not user:
             raise ValueError("User not found")
         
+        # Whitelist of fields that users are allowed to update
+        ALLOWED_PROFILE_FIELDS = {'name', 'email', 'phone_number', 'password', 'is_active'}
+        
         for field, value in updates.items():
-            if hasattr(user, field) and value is not None:
+            # Only update whitelisted fields
+            if field in ALLOWED_PROFILE_FIELDS and hasattr(user, field) and value is not None:
                 setattr(user, field, value)
         
         self.db.commit()
