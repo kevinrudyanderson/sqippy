@@ -35,14 +35,18 @@ class ServiceService:
         """Update a service."""
         service = self.repository.get(service_id)
         if service:
-            return self.repository.update(service, service_update)
+            # Update only the provided fields
+            update_data = service_update.model_dump(exclude_unset=True)
+            for field, value in update_data.items():
+                setattr(service, field, value)
+            return self.repository.update(service)
         return None
     
     def delete_service(self, service_id: str) -> bool:
         """Soft delete a service."""
         service = self.repository.get(service_id)
         if service:
-            service_update = ServiceUpdate(is_active=False)
-            self.repository.update(service, service_update)
+            service.is_active = False
+            self.repository.update(service)
             return True
         return False

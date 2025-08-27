@@ -5,6 +5,7 @@ from uuid import UUID
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
 from app.auth.roles import UserRole
+from app.organizations.models import PlanType
 
 
 class LoginRequest(BaseModel):
@@ -37,6 +38,12 @@ class UserRegistration(BaseModel):
     # Business/location info (optional, can be added later)
     business_name: Optional[str] = Field(default=None, max_length=200)
     business_type: Optional[str] = Field(default=None, max_length=100)
+    
+    # Plan selection (defaults to FREE if not specified)
+    selected_plan: PlanType = Field(default=PlanType.FREE)
+    
+    # Payment info (required for paid plans)
+    stripe_payment_method_id: Optional[str] = Field(default=None, description="Stripe payment method ID for paid plans")
 
 
 class StaffLogin(BaseModel):

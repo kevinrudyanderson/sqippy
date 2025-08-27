@@ -35,5 +35,17 @@ class LocationResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class UpdateLocationRequest(BaseModel):
+    name: Optional[str] = None
+    address: Optional[str] = None
+    city: Optional[str] = None
+    province: Optional[str] = None
+    postal_code: Optional[str] = None
+    country: Optional[str] = None
+    longitude: Optional[float] = None
+    latitude: Optional[float] = None
+    is_active: Optional[bool] = None
+
+
 class LocationWithServices(LocationResponse):
     services: List[Service] = []

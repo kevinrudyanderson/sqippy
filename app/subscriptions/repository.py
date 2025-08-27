@@ -9,7 +9,7 @@ from app.subscriptions.models import Subscription, UsageTracking
 
 class SubscriptionRepository(BaseRepository[Subscription]):
     def __init__(self, db: Session):
-        super().__init__(Subscription, db)
+        super().__init__(db, Subscription)  # Correct order: db first, then model
 
     def get_by_organization(self, organization_id: str) -> Optional[Subscription]:
         return self.db.query(Subscription).filter(
@@ -36,7 +36,7 @@ class SubscriptionRepository(BaseRepository[Subscription]):
 
 class UsageTrackingRepository(BaseRepository[UsageTracking]):
     def __init__(self, db: Session):
-        super().__init__(UsageTracking, db)
+        super().__init__(db, UsageTracking)  # Correct order: db first, then model
 
     def get_current_month(self, organization_id: str) -> Optional[UsageTracking]:
         current_month = datetime.now(timezone.utc).strftime("%Y-%m")

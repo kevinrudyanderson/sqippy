@@ -198,3 +198,4 @@ logs/
 **/__pycache__/
 
 /app/auth/__pycache__
+/app/base/__pycache__

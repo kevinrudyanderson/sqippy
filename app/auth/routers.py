@@ -15,7 +15,8 @@ from app.auth.schemas import (
 )
 from app.auth.service import AuthService
 from app.database import get_db
-from app.organizations.models import Organization
+from app.organizations.models import Organization, PlanType
+from app.subscriptions.service import SubscriptionService
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -36,12 +37,11 @@ async def staff_login(
     response.set_cookie(
         key="refresh_token",
         value=refresh_token,
-        max_age=auth_service.refresh_token_expire_days * 24 * 60 * 60,
         httponly=True,
-        secure=False,  # False for localhost development
-        # samesite removed for cross-port compatibility in development
+        secure=False,  # Must be False for HTTP localhost
+        samesite="Lax",
         path="/",
-        # domain not set - browser will use the exact domain of the request
+        # Remove everything else - let browser handle defaults
     )
 
     return token_response
@@ -53,8 +53,8 @@ def register_user(
     db: Session = Depends(get_db),
     user_repo: UserRepository = Depends(get_user_repository),
 ):
-    """Register a new business owner - creates organization and user"""
-    # Check if user already exists
+    """Register a new business owner - creates organization, user, and subscription with selected plan"""
+    # Check if user already exists by email
     existing_user = user_repo.get_by_email(registration_data.email)
     if existing_user:
         raise HTTPException(
@@ -62,12 +62,48 @@ def register_user(
             detail="User with this email already exists",
         )
 
+    # Check if phone number already exists
+    if registration_data.phone_number:
+        existing_phone = user_repo.get_by_phone(registration_data.phone_number)
+        if existing_phone:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="User with this phone number already exists",
+            )
+
+    # Handle payment for paid plans
+    actual_plan = registration_data.selected_plan
+    stripe_customer_id = None
+    stripe_subscription_id = None
+
+    if registration_data.selected_plan != PlanType.FREE:
+        if not registration_data.stripe_payment_method_id:
+            # Fallback to FREE plan instead of blocking signup
+            actual_plan = PlanType.FREE
+            # TODO: Send email about upgrading to their desired plan
+        else:
+            # TODO: Validate payment method with Stripe
+            # TODO: Create Stripe customer and subscription
+            # If payment fails, fallback to FREE plan
+            try:
+                # For now, we'll create a placeholder Stripe customer ID
+                stripe_customer_id = f"cus_placeholder_{registration_data.email}"
+                stripe_subscription_id = f"sub_placeholder_{registration_data.email}"
+            except Exception:
+                # Payment failed - fallback to FREE
+                actual_plan = PlanType.FREE
+                stripe_customer_id = None
+                stripe_subscription_id = None
+
     auth_service = AuthService(user_repo, db)
 
-    # Create organization first
+    # Create organization with actual plan (may be FREE if payment failed)
     organization = Organization(
         name=registration_data.business_name or f"{registration_data.name}'s Business",
         business_type=registration_data.business_type,
+        plan_type=actual_plan,  # Use actual_plan, not selected_plan
+        stripe_customer_id=stripe_customer_id,
+        stripe_subscription_id=stripe_subscription_id,
     )
     db.add(organization)
     db.flush()  # Get the organization_id without committing
@@ -83,7 +119,37 @@ def register_user(
         is_active=True,
     )
 
-    user = user_repo.create(user_data)
+    try:
+        user = user_repo.create(user_data)
+    except Exception as e:
+        # Rollback the organization creation if user creation fails
+        db.rollback()
+        if "phone_number" in str(e):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Phone number already in use",
+            )
+        elif "email" in str(e):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Email already in use"
+            )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Registration failed. Please try again.",
+            )
+
+    # Create subscription with actual plan
+    subscription_service = SubscriptionService(db)
+    subscription = subscription_service.create_subscription(
+        organization.organization_id, actual_plan  # Use actual_plan, not selected_plan
+    )
+
+    # If successfully got paid plan, update subscription with Stripe IDs
+    if actual_plan != PlanType.FREE and stripe_subscription_id:
+        subscription.stripe_subscription_id = stripe_subscription_id
+        db.commit()
+
     return UserResponse.model_validate(user)
 
 
@@ -99,8 +165,8 @@ async def customer_signup(
         existing_user = user_repo.get_by_email(customer_data.email)
         if existing_user:
             return UserResponse.model_validate(existing_user)
-    
-    # Check if phone is provided and already exists  
+
+    # Check if phone is provided and already exists
     if customer_data.phone_number:
         existing_user = user_repo.get_by_phone(customer_data.phone_number)
         if existing_user:
@@ -136,6 +202,8 @@ async def refresh_token(
     # Get refresh token from cookie
     refresh_token = request.cookies.get("refresh_token")
 
+    print("refresh_token", refresh_token)
+
     if not refresh_token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -158,16 +226,29 @@ async def refresh_token(
     auth_service.invalidate_refresh_token(refresh_token)
 
     # Set new refresh token as HTTP-only cookie
+    # response.set_cookie(
+    #     key="refresh_token",
+    #     value=new_refresh_token,
+    #     max_age=auth_service.refresh_token_expire_days * 24 * 60 * 60,
+    #     httponly=True,
+    #     secure=False,
+    #     # samesite removed for cross-port compatibility in development
+    #     path="/",
+    #     # domain not set - browser will use the exact domain of the request
+    # )
+
     response.set_cookie(
         key="refresh_token",
         value=new_refresh_token,
         max_age=auth_service.refresh_token_expire_days * 24 * 60 * 60,
         httponly=True,
-        secure=False,
-        # samesite removed for cross-port compatibility in development
+        secure=False,  # Must be False for HTTP localhost
+        samesite="Lax",
         path="/",
-        # domain not set - browser will use the exact domain of the request
+        # Remove everything else - let browser handle defaults
     )
+
+    print("new_refresh_token", new_refresh_token)
 
     return TokenResponse(
         access_token=new_access_token,
@@ -192,7 +273,7 @@ async def logout(
 
     # Clear the refresh token cookie
     response.delete_cookie(
-        key="refresh_token", 
+        key="refresh_token",
         path="/",
         # domain not set - browser will use the exact domain of the request
     )
@@ -214,7 +295,7 @@ async def logout_all_devices(
 
     # Clear the refresh token cookie from current device
     response.delete_cookie(
-        key="refresh_token", 
+        key="refresh_token",
         path="/",
         # domain not set - browser will use the exact domain of the request
     )

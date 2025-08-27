@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.locations.dependencies import get_location_repository
-from app.locations.schemas import AddLocationRequest, LocationResponse
+from app.locations.schemas import AddLocationRequest, LocationResponse, UpdateLocationRequest
 from app.locations.service import LocationService
 from app.locations.repository import LocationRepository
 from app.organizations.dependencies import (
@@ -98,5 +98,39 @@ def get_location(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Location not found or access denied"
         )
+    
+    return LocationResponse.model_validate(location)
+
+
+@router.patch("/{location_id}", response_model=LocationResponse)
+def update_location(
+    location_id: str,
+    location_update: UpdateLocationRequest,
+    org_context: OrganizationContext = Depends(get_organization_context),
+    location_repo: LocationRepository = Depends(get_location_repository)
+):
+    """Update a location - only users within the same organization can update"""
+    # First check if location exists and belongs to user's organization
+    if org_context.can_access_all_organizations():
+        location = location_repo.get(location_id)
+    else:
+        location = location_repo.get_organization_location(
+            location_id, 
+            org_context.organization_id
+        )
+    
+    if not location:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Location not found or access denied"
+        )
+    
+    # Update only the provided fields
+    update_data = location_update.model_dump(exclude_unset=True)
+    if update_data:
+        for field, value in update_data.items():
+            setattr(location, field, value)
+        updated_location = location_repo.update(location)
+        return LocationResponse.model_validate(updated_location)
     
     return LocationResponse.model_validate(location)

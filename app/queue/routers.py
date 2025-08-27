@@ -2,12 +2,16 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.auth.dependencies import get_current_user, require_authenticated_user, require_staff_or_admin, get_user_repository
+from app.auth.dependencies import (
+    get_current_user,
+    get_user_repository,
+    require_authenticated_user,
+    require_staff_or_admin,
+)
 from app.auth.models import User
 from app.auth.repository import UserRepository
 from app.auth.schemas import CustomerSignUp
 from app.queue.dependencies import get_queue_service
-from app.subscriptions.dependencies import check_queue_limit
 from app.queue.models import CustomerStatus
 from app.queue.schemas import (
     AddCustomerToQueueRequest,
@@ -21,6 +25,7 @@ from app.queue.schemas import (
     QueueWizardResponse,
 )
 from app.queue.service import QueueService
+from app.subscriptions.dependencies import check_queue_limit
 
 router = APIRouter(prefix="/queues", tags=["queues"])
 
@@ -37,16 +42,18 @@ async def create_queue(
     # Track queue creation in usage
     from app.database import get_db
     from app.subscriptions.service import SubscriptionService
-    
+
     db = next(get_db())
     subscription_service = SubscriptionService(db)
     subscription_service.track_queue_created(current_user.organization_id)
-    
+
     queue = queue_service.create_queue(queue_data)
     return QueueResponse(**queue.__dict__, current_size=0, waiting_customers=0)
 
 
-@router.post("/wizard", response_model=QueueWizardResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/wizard", response_model=QueueWizardResponse, status_code=status.HTTP_201_CREATED
+)
 async def create_queue_wizard(
     wizard_data: QueueWizardRequest,
     current_user: User = Depends(require_staff_or_admin),
@@ -57,11 +64,11 @@ async def create_queue_wizard(
     # Track queue creation in usage
     from app.database import get_db
     from app.subscriptions.service import SubscriptionService
-    
+
     db = next(get_db())
     subscription_service = SubscriptionService(db)
     subscription_service.track_queue_created(current_user.organization_id)
-    
+
     return queue_service.create_queue_wizard(wizard_data, current_user.user_id)
 
 
@@ -213,7 +220,7 @@ async def add_customer_to_queue(
             customer_signup = CustomerSignUp(
                 name=customer_data.customer_name,
                 email=customer_data.customer_email,
-                phone_number=customer_data.customer_phone
+                phone_number=customer_data.customer_phone,
             )
             user = user_repo.get_or_create_customer(customer_signup)
             customer_data.user_id = user.user_id
@@ -331,10 +338,13 @@ async def cancel_customer(
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Customer not found"
             )
-        
+
         # Allow if it's their own entry or they're staff/admin
-        if (customer.user_id != current_user.user_id and 
-            current_user.role not in ["staff", "admin", "super_admin"]):
+        if customer.user_id != current_user.user_id and current_user.role not in [
+            "staff",
+            "admin",
+            "super_admin",
+        ]:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions"
             )

@@ -66,3 +66,7 @@ When adding new features:
 3. Use dependency injection for database sessions and authentication
 4. Add role-based permissions in the module's permissions.py
 5. Register new routers in main.py
+
+### Common Pitfalls
+
+- **Repository Update Method**: The BaseRepository.update() method expects the modified object instance, not an ID and update data. First fetch the object, modify its attributes directly with setattr(), then pass the object to update().
