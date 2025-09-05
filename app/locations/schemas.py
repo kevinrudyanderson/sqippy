@@ -3,7 +3,7 @@ from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict
 
-from app.services.schemas import Service
+from app.queue.schemas import Queue
 
 
 class AddLocationRequest(BaseModel):
@@ -47,5 +47,5 @@ class UpdateLocationRequest(BaseModel):
     is_active: Optional[bool] = None
 
 
-class LocationWithServices(LocationResponse):
-    services: List[Service] = []
+class LocationWithQueues(LocationResponse):
+    queues: List[Queue] = []

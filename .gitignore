@@ -199,3 +199,5 @@ logs/
 
 /app/auth/__pycache__
 /app/base/__pycache__
+test.db-wal
+test.db-shm

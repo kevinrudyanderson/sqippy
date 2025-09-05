@@ -1,16 +1,14 @@
+from datetime import datetime
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.auth.dependencies import (
     get_current_user,
-    get_user_repository,
     require_authenticated_user,
     require_staff_or_admin,
 )
 from app.auth.models import User
-from app.auth.repository import UserRepository
-from app.auth.schemas import CustomerSignUp
 from app.queue.dependencies import get_queue_service
 from app.queue.models import CustomerStatus
 from app.queue.schemas import (
@@ -208,24 +206,14 @@ async def add_customer_to_queue(
     customer_data: AddCustomerToQueueRequest,
     current_user: Optional[User] = Depends(get_current_user),
     queue_service: QueueService = Depends(get_queue_service),
-    user_repo: UserRepository = Depends(get_user_repository),
 ):
     """Add a customer to the queue (public endpoint - no authentication required)"""
     # If user is logged in, use their ID
     if current_user and not customer_data.user_id:
         customer_data.user_id = current_user.user_id
-    elif not current_user and not customer_data.user_id:
-        # Create customer account if email or phone is provided
-        if customer_data.customer_email or customer_data.customer_phone:
-            customer_signup = CustomerSignUp(
-                name=customer_data.customer_name,
-                email=customer_data.customer_email,
-                phone_number=customer_data.customer_phone,
-            )
-            user = user_repo.get_or_create_customer(customer_signup)
-            customer_data.user_id = user.user_id
 
-    customer = queue_service.add_customer_to_queue(queue_id, customer_data)
+    # No need to create a User record - just add customer info directly to queue_customers table
+    customer = await queue_service.add_customer_to_queue(queue_id, customer_data)
 
     # Calculate estimated wait time
     queue = queue_service.get_queue(queue_id)
@@ -297,13 +285,40 @@ async def call_next_customer(
     queue_service: QueueService = Depends(get_queue_service),
 ):
     """Call the next customer in the queue (Staff/Admin only)"""
-    customer = queue_service.call_next_customer(queue_id)
+    customer = await queue_service.call_next_customer(queue_id)
     if not customer:
         return None
 
     return QueueCustomerResponse(
         **customer.__dict__, position=None, estimated_wait_time=0
     )
+
+
+@router.get("/{queue_id}/sms-quota")
+async def get_sms_quota_status(
+    queue_id: str,
+    current_user: User = Depends(require_authenticated_user),
+    queue_service: QueueService = Depends(get_queue_service),
+):
+    """Get SMS quota status for the organization owning this queue"""
+    # Get organization ID from queue
+    from app.locations.models import Location
+    from app.queue.models import Queue
+    from app.services.models import Service
+
+    organization_id = (
+        queue_service.db.query(Location.organization_id)
+        .join(Queue, Queue.location_id == Location.location_id)
+        .filter(Queue.queue_id == queue_id)
+        .scalar()
+    )
+
+    if not organization_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Queue not found"
+        )
+
+    return queue_service.get_sms_quota_status(organization_id)
 
 
 @router.patch(
@@ -354,4 +369,50 @@ async def cancel_customer(
     customer = queue_service.cancel_customer(queue_customer_id)
     return QueueCustomerResponse(
         **customer.__dict__, position=None, estimated_wait_time=0
+    )
+
+
+# Event-based queue endpoints
+@router.get("/events/{event_name}", response_model=List[QueueResponse])
+async def get_queues_by_event(
+    event_name: str,
+    queue_service: QueueService = Depends(get_queue_service),
+):
+    """Get all queues for a specific event"""
+    return queue_service.get_queues_by_event(event_name)
+
+
+@router.get("/mobile", response_model=List[QueueResponse])
+async def get_mobile_queues(
+    queue_service: QueueService = Depends(get_queue_service),
+):
+    """Get all mobile/event-based queues"""
+    return queue_service.get_mobile_queues()
+
+
+@router.post("/events", response_model=QueueResponse)
+async def create_event_queue(
+    service_id: str,
+    location_id: str,
+    event_name: str,
+    event_start_date: datetime,
+    event_end_date: datetime,
+    queue_name: Optional[str] = None,
+    description: Optional[str] = None,
+    max_capacity: Optional[int] = None,
+    estimated_service_time: Optional[int] = None,
+    current_user: User = Depends(require_staff_or_admin),
+    queue_service: QueueService = Depends(get_queue_service),
+):
+    """Create a queue for a specific event"""
+    return queue_service.create_event_queue(
+        service_id=service_id,
+        location_id=location_id,
+        event_name=event_name,
+        event_start_date=event_start_date,
+        event_end_date=event_end_date,
+        queue_name=queue_name,
+        description=description,
+        max_capacity=max_capacity,
+        estimated_service_time=estimated_service_time,
     )

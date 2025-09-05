@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from sqlalchemy import Boolean, Column, DateTime, Float, String, ForeignKey
+from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, String
 from sqlalchemy.orm import relationship
 
 from app.database import Base
@@ -15,7 +15,9 @@ class Location(Base):
     location_id = Column(String, primary_key=True, default=lambda: str(uuid4()))
 
     # Organization relationship
-    organization_id = Column(String, ForeignKey("organizations.organization_id"), nullable=False)
+    organization_id = Column(
+        String, ForeignKey("organizations.organization_id"), nullable=False
+    )
 
     name = Column(String, nullable=False)
     address = Column(String, nullable=True)
@@ -39,6 +41,6 @@ class Location(Base):
 
     # Relationships
     organization = relationship("Organization", back_populates="locations")
-    services = relationship(
-        "Service", back_populates="location", cascade="all, delete-orphan"
+    queues = relationship(
+        "Queue", back_populates="location", cascade="all, delete-orphan"
     )

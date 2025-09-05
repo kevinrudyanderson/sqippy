@@ -202,8 +202,6 @@ async def refresh_token(
     # Get refresh token from cookie
     refresh_token = request.cookies.get("refresh_token")
 
-    print("refresh_token", refresh_token)
-
     if not refresh_token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -247,8 +245,6 @@ async def refresh_token(
         path="/",
         # Remove everything else - let browser handle defaults
     )
-
-    print("new_refresh_token", new_refresh_token)
 
     return TokenResponse(
         access_token=new_access_token,

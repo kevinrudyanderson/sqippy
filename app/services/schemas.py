@@ -17,7 +17,7 @@ class ServiceBase(BaseModel):
 
 
 class ServiceCreate(ServiceBase):
-    location_id: str
+    pass
 
 
 class ServiceUpdate(BaseModel):
@@ -34,7 +34,6 @@ class ServiceInDBBase(ServiceBase):
     model_config = ConfigDict(from_attributes=True)
 
     service_id: str
-    location_id: str
     created_at: datetime
     updated_at: Optional[datetime] = None
 

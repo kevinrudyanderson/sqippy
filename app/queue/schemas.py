@@ -11,8 +11,15 @@ class QueueBase(BaseModel):
     name: str
     description: Optional[str] = None
     service_id: str
+    location_id: str
     max_capacity: Optional[int] = None
     estimated_service_time: Optional[int] = None
+
+    # Event/Mobile queue fields
+    event_name: Optional[str] = None
+    event_start_date: Optional[datetime] = None
+    event_end_date: Optional[datetime] = None
+    is_mobile_queue: bool = False
 
 
 class QueueCreate(QueueBase):
@@ -26,6 +33,12 @@ class QueueUpdate(BaseModel):
     max_capacity: Optional[int] = None
     estimated_service_time: Optional[int] = None
     is_active: Optional[bool] = None
+
+    # Event/Mobile queue fields
+    event_name: Optional[str] = None
+    event_start_date: Optional[datetime] = None
+    event_end_date: Optional[datetime] = None
+    is_mobile_queue: Optional[bool] = None
 
 
 class Queue(QueueBase):
@@ -45,7 +58,9 @@ class QueueResponse(QueueBase):
     is_active: bool
     created_at: datetime
     updated_at: datetime
-    
+    # location_name: str
+    # service_name: str
+
     # Computed fields
     current_size: int = 0
     waiting_customers: int = 0
@@ -83,7 +98,7 @@ class QueueCustomerResponse(QueueCustomerBase):
     completed_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
-    
+
     # Computed fields
     position: Optional[int] = None  # Calculated dynamically based on joined_at
     estimated_wait_time: Optional[int] = None  # in minutes
@@ -107,17 +122,17 @@ class QueuePositionResponse(BaseModel):
     position: Optional[int] = None  # Null when not waiting
     ahead_in_queue: Optional[int] = None  # Null when not waiting
     estimated_wait_time: Optional[int] = None
-    
+
     # Status information
     status: str  # "waiting", "in_service", "completed", "cancelled", "no_show"
     status_message: str  # Human-readable status message
-    
+
     # Customer information
     customer_name: Optional[str] = None
     customer_email: Optional[str] = None
     customer_phone: Optional[str] = None
     party_size: int = 1
-    
+
     # Queue information
     queue_name: str
     queue_id: str
@@ -133,7 +148,7 @@ class QueueStatusResponse(BaseModel):
     is_accepting_customers: bool
 
 
-# Wizard schemas for creating queue + service + location  
+# Wizard schemas for creating queue + service + location
 class WizardNewService(BaseModel):
     name: str
     description: Optional[str] = None
@@ -178,20 +193,28 @@ class QueueWizardRequest(BaseModel):
     queue: WizardQueueConfig
     service: WizardServiceConfig
     location: WizardLocationConfig
-    
+
     def model_validate(cls, v):
         # Validate service config
         if v.service.useExisting and not v.service.existingServiceId:
-            raise ValueError("existingServiceId is required when useExisting is true for service")
+            raise ValueError(
+                "existingServiceId is required when useExisting is true for service"
+            )
         if not v.service.useExisting and not v.service.newService:
-            raise ValueError("newService data is required when useExisting is false for service")
-        
-        # Validate location config  
+            raise ValueError(
+                "newService data is required when useExisting is false for service"
+            )
+
+        # Validate location config
         if v.location.useExisting and not v.location.existingLocationId:
-            raise ValueError("existingLocationId is required when useExisting is true for location")
+            raise ValueError(
+                "existingLocationId is required when useExisting is true for location"
+            )
         if not v.location.useExisting and not v.location.newLocation:
-            raise ValueError("newLocation data is required when useExisting is false for location")
-        
+            raise ValueError(
+                "newLocation data is required when useExisting is false for location"
+            )
+
         return v
 
 

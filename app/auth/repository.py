@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.auth.models import User
 from app.auth.roles import UserRole
-from app.auth.schemas import CustomerSignUp, StaffCreate, UserUpdate
+from app.auth.schemas import StaffCreate, UserUpdate
 from app.base import BaseRepository
 
 
@@ -16,15 +16,6 @@ class UserRepository(BaseRepository[User]):
     def get_by_email(self, email: str) -> Optional[User]:
         return self.db.query(User).filter(User.email == email).first()
 
-    def get_or_create_customer(self, customer_signup: CustomerSignUp) -> User:
-        user = self.get_by_email(customer_signup.email)
-        if not user:
-            user = User(
-                **customer_signup.model_dump(),
-                role=UserRole.CUSTOMER,
-            )
-            user = self.create(user)
-        return user
 
     def update_user(self, user_id: UUID, user_update: UserUpdate) -> User:
         user = self.get(user_id)
