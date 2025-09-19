@@ -1,6 +1,7 @@
 import uuid
 
 from sqlalchemy import (
+    UUID,
     Boolean,
     Column,
     DateTime,
@@ -19,7 +20,7 @@ from app.database import Base
 class Service(Base):
     __tablename__ = "services"
 
-    service_id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    service_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String, nullable=False)
     description = Column(Text)
 

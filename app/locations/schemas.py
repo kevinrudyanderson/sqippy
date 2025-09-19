@@ -1,15 +1,16 @@
 from datetime import datetime
 from typing import List, Optional
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
 
 # Simple queue representation to avoid circular imports
 class LocationQueueInfo(BaseModel):
-    queue_id: str
+    queue_id: UUID
     name: str
     description: Optional[str] = None
-    service_id: str
+    service_id: UUID
     status: str
     is_active: bool
     current_size: int = 0
@@ -28,7 +29,7 @@ class AddLocationRequest(BaseModel):
 
 
 class LocationResponse(BaseModel):
-    location_id: str
+    location_id: UUID
     name: str
     address: Optional[str] = None
     city: Optional[str] = None

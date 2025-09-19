@@ -1,5 +1,6 @@
 from datetime import datetime
 from typing import Optional
+from uuid import UUID
 
 from pydantic import BaseModel, Field
 
@@ -10,8 +11,8 @@ from app.queue.models import CustomerStatus, QueueStatus
 class QueueBase(BaseModel):
     name: str
     description: Optional[str] = None
-    service_id: str
-    location_id: str
+    service_id: UUID
+    location_id: UUID
     max_capacity: Optional[int] = None
     estimated_service_time: Optional[int] = None
 
@@ -42,7 +43,7 @@ class QueueUpdate(BaseModel):
 
 
 class Queue(QueueBase):
-    queue_id: str
+    queue_id: UUID
     status: QueueStatus
     is_active: bool
     created_at: datetime
@@ -53,7 +54,7 @@ class Queue(QueueBase):
 
 
 class QueueResponse(QueueBase):
-    queue_id: str
+    queue_id: UUID
     status: QueueStatus
     is_active: bool
     created_at: datetime
@@ -71,8 +72,8 @@ class QueueResponse(QueueBase):
 
 # QueueCustomer Schemas
 class QueueCustomerBase(BaseModel):
-    queue_id: str
-    user_id: Optional[str] = None
+    queue_id: UUID
+    user_id: Optional[UUID] = None
     customer_name: Optional[str] = None
     customer_phone: Optional[str] = None
     customer_email: Optional[str] = None
@@ -91,7 +92,7 @@ class QueueCustomerUpdate(BaseModel):
 
 
 class QueueCustomerResponse(QueueCustomerBase):
-    queue_customer_id: str
+    queue_customer_id: UUID
     status: CustomerStatus
     joined_at: datetime
     called_at: Optional[datetime] = None
@@ -109,7 +110,7 @@ class QueueCustomerResponse(QueueCustomerBase):
 
 # Additional schemas for queue operations
 class AddCustomerToQueueRequest(BaseModel):
-    user_id: Optional[str] = None
+    user_id: Optional[UUID] = None
     customer_name: Optional[str] = None
     customer_phone: Optional[str] = None
     customer_email: Optional[str] = None
@@ -118,7 +119,7 @@ class AddCustomerToQueueRequest(BaseModel):
 
 
 class QueuePositionResponse(BaseModel):
-    queue_customer_id: str
+    queue_customer_id: UUID
     position: Optional[int] = None  # Null when not waiting
     ahead_in_queue: Optional[int] = None  # Null when not waiting
     estimated_wait_time: Optional[int] = None
@@ -135,11 +136,11 @@ class QueuePositionResponse(BaseModel):
 
     # Queue information
     queue_name: str
-    queue_id: str
+    queue_id: UUID
 
 
 class QueueStatusResponse(BaseModel):
-    queue_id: str
+    queue_id: UUID
     name: str
     status: QueueStatus
     current_size: int
@@ -161,7 +162,7 @@ class WizardNewService(BaseModel):
 
 class WizardServiceConfig(BaseModel):
     useExisting: bool
-    existingServiceId: Optional[str] = None
+    existingServiceId: Optional[UUID] = None
     newService: Optional[WizardNewService] = None
 
 
@@ -178,7 +179,7 @@ class WizardNewLocation(BaseModel):
 
 class WizardLocationConfig(BaseModel):
     useExisting: bool
-    existingLocationId: Optional[str] = None
+    existingLocationId: Optional[UUID] = None
     newLocation: Optional[WizardNewLocation] = None
 
 
@@ -219,11 +220,11 @@ class QueueWizardRequest(BaseModel):
 
 
 class QueueWizardResponse(BaseModel):
-    queue_id: str
+    queue_id: UUID
     queue_name: str
-    service_id: str
+    service_id: UUID
     service_name: str
-    location_id: str
+    location_id: UUID
     location_name: str
     created_new_service: bool
     created_new_location: bool

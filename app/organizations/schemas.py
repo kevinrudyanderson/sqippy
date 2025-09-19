@@ -1,5 +1,7 @@
 from datetime import datetime
 from typing import Optional
+from uuid import UUID
+
 from pydantic import BaseModel, Field
 
 
@@ -17,11 +19,13 @@ class OrganizationBase(BaseModel):
 
 class OrganizationCreate(OrganizationBase):
     """Schema for creating a new organization"""
+
     pass
 
 
 class OrganizationUpdate(BaseModel):
     """Schema for updating an organization (all fields optional)"""
+
     name: Optional[str] = Field(None, min_length=1, max_length=255)
     business_type: Optional[str] = Field(None, max_length=100)
     description: Optional[str] = None
@@ -35,7 +39,8 @@ class OrganizationUpdate(BaseModel):
 
 class OrganizationResponse(OrganizationBase):
     """Schema for organization responses"""
-    organization_id: str
+
+    organization_id: UUID
     is_active: bool
     created_at: datetime
     updated_at: datetime
@@ -46,7 +51,8 @@ class OrganizationResponse(OrganizationBase):
 
 class OrganizationSummary(BaseModel):
     """Lightweight organization summary"""
-    organization_id: str
+
+    organization_id: UUID
     name: str
     business_type: Optional[str]
     city: Optional[str]

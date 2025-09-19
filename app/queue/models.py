@@ -2,7 +2,16 @@ import enum
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from sqlalchemy import Boolean, Column, DateTime, Enum, ForeignKey, Integer, String
+from sqlalchemy import (
+    UUID,
+    Boolean,
+    Column,
+    DateTime,
+    Enum,
+    ForeignKey,
+    Integer,
+    String,
+)
 from sqlalchemy.orm import relationship
 
 from app.database import Base
@@ -25,16 +34,18 @@ class CustomerStatus(enum.Enum):
 class Queue(Base):
     __tablename__ = "queues"
 
-    # TODO: Remove this once we use postgres
-    # queue_id = Column(UUID, primary_key=True, default=uuid4)
-    queue_id = Column(String, primary_key=True, default=lambda: str(uuid4()))
+    queue_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
 
     name = Column(String, nullable=False)
     description = Column(String, nullable=True)
 
     # Foreign keys
-    service_id = Column(String, ForeignKey("services.service_id"), nullable=False)
-    location_id = Column(String, ForeignKey("locations.location_id"), nullable=False)
+    service_id = Column(
+        UUID(as_uuid=True), ForeignKey("services.service_id"), nullable=False
+    )
+    location_id = Column(
+        UUID(as_uuid=True), ForeignKey("locations.location_id"), nullable=False
+    )
 
     status = Column(Enum(QueueStatus), default=QueueStatus.ACTIVE, nullable=False)
 
@@ -70,14 +81,12 @@ class Queue(Base):
 class QueueCustomer(Base):
     __tablename__ = "queue_customers"
 
-    # TODO: Remove this once we use postgres
-    # queue_customer_id = Column(UUID, primary_key=True, default=uuid4)
-    queue_customer_id = Column(String, primary_key=True, default=lambda: str(uuid4()))
+    queue_customer_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
 
     # Foreign keys
-    queue_id = Column(String, ForeignKey("queues.queue_id"), nullable=False)
+    queue_id = Column(UUID(as_uuid=True), ForeignKey("queues.queue_id"), nullable=False)
     user_id = Column(
-        String, ForeignKey("users.user_id"), nullable=True
+        UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=True
     )  # Optional, for registered users
 
     # Customer info (for non-registered customers)

@@ -37,7 +37,9 @@ async def create_queue(
     queue_service: QueueService = Depends(get_queue_service),
 ):
     """Create a new queue (Staff/Admin only)"""
-    # Track queue creation in usage
+    queue = queue_service.create_queue(queue_data)
+
+    # Track queue creation in usage after successful creation
     from app.database import get_db
     from app.subscriptions.service import SubscriptionService
 
@@ -45,7 +47,6 @@ async def create_queue(
     subscription_service = SubscriptionService(db)
     subscription_service.track_queue_created(current_user.organization_id)
 
-    queue = queue_service.create_queue(queue_data)
     return QueueResponse(**queue.__dict__, current_size=0, waiting_customers=0)
 
 
@@ -59,7 +60,9 @@ async def create_queue_wizard(
     queue_service: QueueService = Depends(get_queue_service),
 ):
     """Create queue, service, and location in one operation (Wizard endpoint)"""
-    # Track queue creation in usage
+    result = queue_service.create_queue_wizard(wizard_data, current_user.user_id)
+
+    # Track queue creation in usage after successful creation
     from app.database import get_db
     from app.subscriptions.service import SubscriptionService
 
@@ -67,7 +70,24 @@ async def create_queue_wizard(
     subscription_service = SubscriptionService(db)
     subscription_service.track_queue_created(current_user.organization_id)
 
-    return queue_service.create_queue_wizard(wizard_data, current_user.user_id)
+    return result
+
+
+# Specific routes must come before generic {queue_id} route
+@router.get("/mobile", response_model=List[QueueResponse])
+async def get_mobile_queues(
+    queue_service: QueueService = Depends(get_queue_service),
+):
+    """Get all mobile/event-based queues"""
+    return queue_service.get_mobile_queues()
+
+
+@router.get("/events/{event_name}", response_model=List[QueueResponse])
+async def get_queues_by_event(
+    event_name: str, queue_service: QueueService = Depends(get_queue_service)
+):
+    """Get all queues for a specific event"""
+    return queue_service.get_queues_by_event(event_name)
 
 
 @router.get("/{queue_id}", response_model=QueueResponse)
@@ -372,22 +392,7 @@ async def cancel_customer(
     )
 
 
-# Event-based queue endpoints
-@router.get("/events/{event_name}", response_model=List[QueueResponse])
-async def get_queues_by_event(
-    event_name: str,
-    queue_service: QueueService = Depends(get_queue_service),
-):
-    """Get all queues for a specific event"""
-    return queue_service.get_queues_by_event(event_name)
-
-
-@router.get("/mobile", response_model=List[QueueResponse])
-async def get_mobile_queues(
-    queue_service: QueueService = Depends(get_queue_service),
-):
-    """Get all mobile/event-based queues"""
-    return queue_service.get_mobile_queues()
+# Event-based queue endpoints (duplicates removed - moved above)
 
 
 @router.post("/events", response_model=QueueResponse)
@@ -405,7 +410,7 @@ async def create_event_queue(
     queue_service: QueueService = Depends(get_queue_service),
 ):
     """Create a queue for a specific event"""
-    return queue_service.create_event_queue(
+    queue = queue_service.create_event_queue(
         service_id=service_id,
         location_id=location_id,
         event_name=event_name,
@@ -416,3 +421,13 @@ async def create_event_queue(
         max_capacity=max_capacity,
         estimated_service_time=estimated_service_time,
     )
+
+    # Track queue creation in usage after successful creation
+    from app.database import get_db
+    from app.subscriptions.service import SubscriptionService
+
+    db = next(get_db())
+    subscription_service = SubscriptionService(db)
+    subscription_service.track_queue_created(current_user.organization_id)
+
+    return queue

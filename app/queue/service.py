@@ -150,6 +150,10 @@ class QueueService:
 
                 if not sms_success:
                     print(f"Failed to send welcome SMS: {sms_message}")
+                    # raise HTTPException(
+                    #     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    #     detail=f"Failed to send welcome SMS: {sms_message}",
+                    # )
 
         return customer
 
@@ -349,9 +353,8 @@ class QueueService:
                         status_code=status.HTTP_400_BAD_REQUEST,
                         detail="New service data is required when useExisting is false",
                     )
-                # Create new service
+                # Create new service (services are now global, no location_id needed)
                 service = Service(
-                    location_id=location.location_id,
                     **wizard_data.service.newService.model_dump(),
                 )
                 service = self.service_repo.create(service)
@@ -360,6 +363,7 @@ class QueueService:
             # Create queue
             queue = Queue(
                 service_id=service.service_id,
+                location_id=location.location_id,
                 name=wizard_data.queue.name,
                 description=wizard_data.queue.description,
                 max_capacity=wizard_data.queue.max_capacity,

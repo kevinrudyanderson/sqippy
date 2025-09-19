@@ -1,5 +1,6 @@
 from datetime import datetime
 from typing import List, Optional
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
@@ -33,7 +34,7 @@ class ServiceUpdate(BaseModel):
 class ServiceInDBBase(ServiceBase):
     model_config = ConfigDict(from_attributes=True)
 
-    service_id: str
+    service_id: UUID
     created_at: datetime
     updated_at: Optional[datetime] = None
 

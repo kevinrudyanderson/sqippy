@@ -12,6 +12,18 @@ class Settings:
         "SQLALCHEMY_DATABASE_URL", "sqlite:///./test.db"
     )
 
+    # PostgreSQL specific settings
+    POSTGRES_HOST: str = os.getenv("POSTGRES_HOST", "localhost")
+    POSTGRES_PORT: int = int(os.getenv("POSTGRES_PORT", "5432"))
+    POSTGRES_DB: str = os.getenv("POSTGRES_DB", "sqipit")
+    POSTGRES_USER: str = os.getenv("POSTGRES_USER", "sqipit_user")
+    POSTGRES_PASSWORD: str = os.getenv("POSTGRES_PASSWORD", "")
+
+    @property
+    def postgres_url(self) -> str:
+        """Generate PostgreSQL URL from individual components"""
+        return f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+
     # Auth
     SECRET_KEY: str = os.getenv("SECRET_KEY", "your_secret_key_here")
     ALGORITHM: str = os.getenv("ALGORITHM", "HS256")

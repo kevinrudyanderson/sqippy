@@ -1,5 +1,6 @@
 from datetime import datetime
 from typing import Optional
+from uuid import UUID
 
 from pydantic import BaseModel
 
@@ -12,7 +13,7 @@ class SubscriptionBase(BaseModel):
 
 
 class SubscriptionCreate(SubscriptionBase):
-    organization_id: str
+    organization_id: UUID
     queue_limit: int
     sms_credits_total: int
     sms_credits_used: int = 0
@@ -27,8 +28,8 @@ class SubscriptionUpdate(BaseModel):
 
 
 class SubscriptionResponse(SubscriptionBase):
-    subscription_id: str
-    organization_id: str
+    subscription_id: UUID
+    organization_id: UUID
     current_period_start: datetime
     current_period_end: Optional[datetime]
     queue_limit: int
@@ -55,7 +56,7 @@ class UsageTrackingBase(BaseModel):
 
 
 class UsageTrackingCreate(UsageTrackingBase):
-    organization_id: str
+    organization_id: UUID
 
 
 class UsageTrackingUpdate(BaseModel):
@@ -66,8 +67,8 @@ class UsageTrackingUpdate(BaseModel):
 
 
 class UsageTrackingResponse(UsageTrackingBase):
-    tracking_id: str
-    organization_id: str
+    tracking_id: UUID
+    organization_id: UUID
     last_activity_at: datetime
     created_at: datetime
     updated_at: datetime

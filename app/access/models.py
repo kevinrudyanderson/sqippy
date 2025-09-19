@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 from sqlalchemy import (
+    UUID,
     Boolean,
     Column,
     DateTime,
@@ -53,14 +54,16 @@ class UserLocationAccess(Base):
 
     __tablename__ = "user_location_access"
 
-    access_id = Column(String, primary_key=True, default=lambda: str(uuid4()))
-    user_id = Column(String, ForeignKey("users.user_id"), nullable=False)
-    location_id = Column(String, ForeignKey("locations.location_id"), nullable=False)
+    access_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=False)
+    location_id = Column(
+        UUID(as_uuid=True), ForeignKey("locations.location_id"), nullable=False
+    )
     access_level = Column(Enum(AccessLevel), nullable=False)
 
     # Audit fields
     granted_by = Column(
-        String, ForeignKey("users.user_id"), nullable=True
+        UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=True
     )  # Who granted this access
     granted_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     expires_at = Column(

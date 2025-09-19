@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, String
+from sqlalchemy import UUID, Boolean, Column, DateTime, Float, ForeignKey, String
 from sqlalchemy.orm import relationship
 
 from app.database import Base
@@ -10,13 +10,11 @@ from app.database import Base
 class Location(Base):
     __tablename__ = "locations"
 
-    # TODO: Remove this once we use postgres
-    # location_id = Column(UUID, primary_key=True, default=uuid4)
-    location_id = Column(String, primary_key=True, default=lambda: str(uuid4()))
+    location_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
 
     # Organization relationship
     organization_id = Column(
-        String, ForeignKey("organizations.organization_id"), nullable=False
+        UUID(as_uuid=True), ForeignKey("organizations.organization_id"), nullable=False
     )
 
     name = Column(String, nullable=False)

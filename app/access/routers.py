@@ -1,4 +1,5 @@
 from typing import List
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
@@ -14,16 +15,16 @@ from app.database import get_db
 
 class GrantAccessRequest(BaseModel):
     user_email: str
-    location_id: str
+    location_id: UUID
     access_level: AccessLevel
 
 
 class AccessResponse(BaseModel):
-    access_id: str
-    user_id: str
-    location_id: str
+    access_id: UUID
+    user_id: UUID
+    location_id: UUID
     access_level: AccessLevel
-    granted_by: str
+    granted_by: UUID
     granted_at: str
     is_active: bool
 
