@@ -1,5 +1,5 @@
 import os
-from typing import Optional
+from typing import List, Optional
 
 from dotenv import load_dotenv
 
@@ -12,6 +12,15 @@ def _get_bool(env_var_name: str, default: bool = False) -> bool:
     if value is None:
         return default
     return value.strip().lower() in {"1", "true", "t", "yes", "y", "on"}
+
+
+def _get_list(env_var_name: str, default: Optional[List[str]] = None) -> List[str]:
+    """Parse a comma-separated env variable into a cleaned list."""
+    raw_value = os.getenv(env_var_name)
+    if raw_value is None or raw_value.strip() == "":
+        return list(default or [])
+
+    return [item.strip() for item in raw_value.split(",") if item.strip()]
 
 
 class Settings:
@@ -53,6 +62,18 @@ class Settings:
     COOKIE_SECURE: bool = _get_bool(
         "COOKIE_SECURE", default=ENV.strip().lower() == "production"
     )
+
+    # CORS
+    CORS_ALLOW_ORIGINS: List[str] = _get_list(
+        "CORS_ALLOW_ORIGINS",
+        default=[
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+            "http://localhost:5678",
+            "http://127.0.0.1:5678",
+        ],
+    )
+    CORS_ALLOW_ORIGIN_REGEX: Optional[str] = os.getenv("CORS_ALLOW_ORIGIN_REGEX")
 
     # Subscription Tiers
     FREE_QUEUE_LIMIT: int = int(os.getenv("FREE_QUEUE_LIMIT", "1"))

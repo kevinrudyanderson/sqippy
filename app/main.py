@@ -1,4 +1,3 @@
-import os
 from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
@@ -7,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.auth import models as auth_models  # noqa: F401
 from app.auth.routers import router as auth_router
+from app.config import settings
 from app.database import Base, engine
 from app.locations import models as location_models  # noqa: F401
 from app.locations.routers import router as location_router
@@ -28,10 +28,8 @@ from app.users.routers import router as users_router
 
 load_dotenv()
 
-ENV = os.getenv("ENV", "development")
-
-docs_url = "/docs" if ENV == "development" else None
-redoc_url = "/redoc" if ENV == "development" else None
+docs_url = "/docs" if settings.ENV == "development" else None
+redoc_url = "/redoc" if settings.ENV == "development" else None
 
 
 @asynccontextmanager
@@ -50,8 +48,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Muggli API",
-    description="API for the Muggli application",
+    title="Queueless API",
+    description="API for the Queueless application",
     version="0.0.1",
     docs_url=docs_url,
     redoc_url=redoc_url,
@@ -61,12 +59,8 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://localhost:5678",
-        "http://127.0.0.1:5678",
-    ],
+    allow_origins=settings.CORS_ALLOW_ORIGINS,
+    allow_origin_regex=settings.CORS_ALLOW_ORIGIN_REGEX,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
