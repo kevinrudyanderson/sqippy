@@ -58,8 +58,8 @@ class QueueResponse(QueueBase):
     is_active: bool
     created_at: datetime
     updated_at: datetime
-    # location_name: str
-    # service_name: str
+
+    service_name: Optional[str] = None
 
     # Computed fields
     current_size: int = 0

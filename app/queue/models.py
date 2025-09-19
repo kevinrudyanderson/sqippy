@@ -108,4 +108,5 @@ class QueueCustomer(Base):
 
     # Relationships
     queue = relationship("Queue", back_populates="customers")
+
     user = relationship("app.auth.models.User", backref="queue_entries")

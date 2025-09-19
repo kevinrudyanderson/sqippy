@@ -3,7 +3,17 @@ from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict
 
-from app.queue.schemas import Queue
+
+# Simple queue representation to avoid circular imports
+class LocationQueueInfo(BaseModel):
+    queue_id: str
+    name: str
+    description: Optional[str] = None
+    service_id: str
+    status: str
+    is_active: bool
+    current_size: int = 0
+    waiting_customers: int = 0
 
 
 class AddLocationRequest(BaseModel):
@@ -48,4 +58,4 @@ class UpdateLocationRequest(BaseModel):
 
 
 class LocationWithQueues(LocationResponse):
-    queues: List[Queue] = []
+    queues: List[LocationQueueInfo] = []
