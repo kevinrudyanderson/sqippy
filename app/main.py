@@ -37,13 +37,14 @@ redoc_url = "/redoc" if ENV == "development" else None
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
-    
+
     # Start the subscription scheduler
     from app.subscriptions.scheduler import start_scheduler, stop_scheduler
+
     await start_scheduler()
-    
+
     yield
-    
+
     # Stop the scheduler on shutdown
     await stop_scheduler()
 
