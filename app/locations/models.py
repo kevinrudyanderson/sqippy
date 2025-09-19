@@ -27,8 +27,8 @@ class Location(Base):
 
     is_active = Column(Boolean, default=True)
 
-    longitude = Column(Float, nullable=False)
-    latitude = Column(Float, nullable=False)
+    longitude = Column(Float, nullable=True)
+    latitude = Column(Float, nullable=True)
 
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(

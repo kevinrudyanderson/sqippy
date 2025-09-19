@@ -4,6 +4,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
+from app.services.schemas import ServiceBase
+
 
 # Simple queue representation to avoid circular imports
 class LocationQueueInfo(BaseModel):
@@ -42,6 +44,7 @@ class LocationResponse(BaseModel):
     is_active: bool
     created_at: datetime
     updated_at: Optional[datetime] = None
+    services: List[ServiceBase] = []
 
     model_config = ConfigDict(from_attributes=True)
 
