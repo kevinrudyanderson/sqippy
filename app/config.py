@@ -6,7 +6,18 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
+def _get_bool(env_var_name: str, default: bool = False) -> bool:
+    """Read a boolean environment variable with a sensible default."""
+    value = os.getenv(env_var_name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "t", "yes", "y", "on"}
+
+
 class Settings:
+    # Environment
+    ENV: str = os.getenv("ENV", "development")
+
     # Database
     SQLALCHEMY_DATABASE_URL: str = os.getenv(
         "SQLALCHEMY_DATABASE_URL", "sqlite:///./test.db"
@@ -32,8 +43,16 @@ class Settings:
     )
     REFRESH_TOKEN_EXPIRE_DAYS: int = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "7"))
 
-    # Environment
-    ENV: str = os.getenv("ENV", "development")
+    # Cookies
+    REFRESH_TOKEN_COOKIE_NAME: str = os.getenv(
+        "REFRESH_TOKEN_COOKIE_NAME", "refresh_token"
+    )
+    COOKIE_DOMAIN: Optional[str] = os.getenv("COOKIE_DOMAIN")
+    COOKIE_PATH: str = os.getenv("COOKIE_PATH", "/")
+    COOKIE_SAMESITE: str = os.getenv("COOKIE_SAMESITE", "lax").strip().lower()
+    COOKIE_SECURE: bool = _get_bool(
+        "COOKIE_SECURE", default=ENV.strip().lower() == "production"
+    )
 
     # Subscription Tiers
     FREE_QUEUE_LIMIT: int = int(os.getenv("FREE_QUEUE_LIMIT", "1"))

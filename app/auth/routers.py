@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.orm import Session
 
+from app.auth.cookies import clear_refresh_token_cookie, set_refresh_token_cookie
 from app.auth.dependencies import get_user_repository, require_admin
 from app.auth.models import User
 from app.auth.repository import UserRepository
@@ -14,6 +15,7 @@ from app.auth.schemas import (
     UserResponse,
 )
 from app.auth.service import AuthService
+from app.config import settings
 from app.database import get_db
 from app.organizations.models import Organization, PlanType
 from app.subscriptions.service import SubscriptionService
@@ -33,16 +35,10 @@ async def staff_login(
         login_data.email, login_data.password
     )
 
+    refresh_token_max_age = auth_service.refresh_token_expire_days * 24 * 60 * 60
+
     # Set refresh token as HTTP-only cookie
-    response.set_cookie(
-        key="refresh_token",
-        value=refresh_token,
-        httponly=True,
-        secure=False,  # Must be False for HTTP localhost
-        samesite="Lax",
-        path="/",
-        # Remove everything else - let browser handle defaults
-    )
+    set_refresh_token_cookie(response, refresh_token, refresh_token_max_age)
 
     return token_response
 
@@ -200,7 +196,7 @@ async def refresh_token(
     auth_service = AuthService(user_repo, db)
 
     # Get refresh token from cookie
-    refresh_token = request.cookies.get("refresh_token")
+    refresh_token = request.cookies.get(settings.REFRESH_TOKEN_COOKIE_NAME)
 
     if not refresh_token:
         raise HTTPException(
@@ -223,28 +219,10 @@ async def refresh_token(
     # Invalidate old refresh token
     auth_service.invalidate_refresh_token(refresh_token)
 
-    # Set new refresh token as HTTP-only cookie
-    # response.set_cookie(
-    #     key="refresh_token",
-    #     value=new_refresh_token,
-    #     max_age=auth_service.refresh_token_expire_days * 24 * 60 * 60,
-    #     httponly=True,
-    #     secure=False,
-    #     # samesite removed for cross-port compatibility in development
-    #     path="/",
-    #     # domain not set - browser will use the exact domain of the request
-    # )
+    refresh_token_max_age = auth_service.refresh_token_expire_days * 24 * 60 * 60
 
-    response.set_cookie(
-        key="refresh_token",
-        value=new_refresh_token,
-        max_age=auth_service.refresh_token_expire_days * 24 * 60 * 60,
-        httponly=True,
-        secure=False,  # Must be False for HTTP localhost
-        samesite="Lax",
-        path="/",
-        # Remove everything else - let browser handle defaults
-    )
+    # Set new refresh token as HTTP-only cookie
+    set_refresh_token_cookie(response, new_refresh_token, refresh_token_max_age)
 
     return TokenResponse(
         access_token=new_access_token,
@@ -263,16 +241,12 @@ async def logout(
     auth_service = AuthService(user_repo, db)
 
     # Get refresh token from cookie
-    refresh_token = request.cookies.get("refresh_token")
+    refresh_token = request.cookies.get(settings.REFRESH_TOKEN_COOKIE_NAME)
     if refresh_token:
         auth_service.invalidate_refresh_token(refresh_token)
 
     # Clear the refresh token cookie
-    response.delete_cookie(
-        key="refresh_token",
-        path="/",
-        # domain not set - browser will use the exact domain of the request
-    )
+    clear_refresh_token_cookie(response)
 
     return {"message": "Logged out successfully"}
 
@@ -290,10 +264,6 @@ async def logout_all_devices(
     count = auth_service.invalidate_all_user_refresh_tokens(current_user.user_id)
 
     # Clear the refresh token cookie from current device
-    response.delete_cookie(
-        key="refresh_token",
-        path="/",
-        # domain not set - browser will use the exact domain of the request
-    )
+    clear_refresh_token_cookie(response)
 
     return {"message": f"Logged out from {count} devices"}
