@@ -250,8 +250,8 @@ class QueueCustomerRepository(BaseRepository[QueueCustomer]):
                     email_result = await notification_service.send_next_in_line_email(
                         next_customer.customer_email,
                         next_customer.customer_name,
-                        next_customer.queue.service.name,
-                        next_customer.queue.service.location.name,
+                        next_customer.queue.name,
+                        next_customer.queue.location.name,
                     )
                     if email_result.success:
                         email_sent = True
@@ -271,8 +271,8 @@ class QueueCustomerRepository(BaseRepository[QueueCustomer]):
                         sms_result = await notification_service.send_next_in_line_sms(
                             next_customer.customer_phone,
                             next_customer.customer_name,
-                            next_customer.queue.service.name,
-                            next_customer.queue.service.location.name,
+                            next_customer.queue.name,
+                            next_customer.queue.location.name,
                         )
                         if sms_result.success:
                             sms_sent = True
