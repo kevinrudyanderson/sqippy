@@ -1,4 +1,5 @@
 from typing import List
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -39,18 +40,18 @@ def create_location(
 
 @router.get("/debug/{location_id}")
 def debug_location_access(
-    location_id: str,
+    location_id: UUID,
     org_context: OrganizationContext = Depends(get_organization_context),
     db: Session = Depends(get_db),
 ):
     """Debug endpoint to check organization access to a location"""
     location_repo = LocationRepository(db)
-    location = location_repo.get(location_id)
+    location = location_repo.get(str(location_id))
 
     return {
         "user_id": org_context.user.user_id,
         "organization_id": org_context.organization_id,
-        "location_id": location_id,
+        "location_id": str(location_id),
         "location_exists": location is not None,
         "location_organization_id": location.organization_id if location else None,
         "same_organization": (
@@ -85,11 +86,11 @@ def get_locations(
 
 @router.get("/{location_id}", response_model=LocationResponse)
 def get_location(
-    location_id: str,
+    location_id: UUID,
     location_repo: LocationRepository = Depends(get_location_repository),
 ):
     """Get a specific location (public endpoint)"""
-    location = location_repo.get(location_id)
+    location = location_repo.get(str(location_id))
 
     if not location:
         raise HTTPException(
@@ -101,7 +102,7 @@ def get_location(
 
 @router.patch("/{location_id}", response_model=LocationResponse)
 def update_location(
-    location_id: str,
+    location_id: UUID,
     location_update: UpdateLocationRequest,
     org_context: OrganizationContext = Depends(get_organization_context),
     location_repo: LocationRepository = Depends(get_location_repository),
@@ -109,10 +110,10 @@ def update_location(
     """Update a location - only users within the same organization can update"""
     # First check if location exists and belongs to user's organization
     if org_context.can_access_all_organizations():
-        location = location_repo.get(location_id)
+        location = location_repo.get(str(location_id))
     else:
         location = location_repo.get_organization_location(
-            location_id, org_context.organization_id
+            str(location_id), org_context.organization_id
         )
 
     if not location:
