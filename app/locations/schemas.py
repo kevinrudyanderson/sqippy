@@ -39,8 +39,8 @@ class LocationResponse(BaseModel):
     state: Optional[str] = None
     postal_code: Optional[str] = None
     country: Optional[str] = "NL"
-    longitude: float
-    latitude: float
+    longitude: Optional[float] = None
+    latitude: Optional[float] = None
     is_active: bool
     created_at: datetime
     updated_at: Optional[datetime] = None

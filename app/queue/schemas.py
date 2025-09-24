@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.queue.models import CustomerStatus, QueueStatus
 
@@ -165,6 +165,13 @@ class WizardServiceConfig(BaseModel):
     existingServiceId: Optional[UUID] = None
     newService: Optional[WizardNewService] = None
 
+    @field_validator("existingServiceId", mode="before")
+    @classmethod
+    def validate_existing_service_id(cls, v):
+        if v == "" or v is None:
+            return None
+        return v
+
 
 class WizardNewLocation(BaseModel):
     name: str
@@ -181,6 +188,13 @@ class WizardLocationConfig(BaseModel):
     useExisting: bool
     existingLocationId: Optional[UUID] = None
     newLocation: Optional[WizardNewLocation] = None
+
+    @field_validator("existingLocationId", mode="before")
+    @classmethod
+    def validate_existing_location_id(cls, v):
+        if v == "" or v is None:
+            return None
+        return v
 
 
 class WizardQueueConfig(BaseModel):
@@ -201,10 +215,11 @@ class QueueWizardRequest(BaseModel):
             raise ValueError(
                 "existingServiceId is required when useExisting is true for service"
             )
-        if not v.service.useExisting and not v.service.newService:
-            raise ValueError(
-                "newService data is required when useExisting is false for service"
-            )
+        # Note: newService is optional since new service creation is currently disabled
+        # if not v.service.useExisting and not v.service.newService:
+        #     raise ValueError(
+        #         "newService data is required when useExisting is false for service"
+        #     )
 
         # Validate location config
         if v.location.useExisting and not v.location.existingLocationId:
