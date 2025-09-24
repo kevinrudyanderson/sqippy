@@ -19,6 +19,7 @@ class SMSService:
         customer_phone: str,
         customer_name: str,
         queue_name: str,
+        location_name: str,
         notification_type: str,
         **kwargs,
     ) -> Tuple[bool, str]:
@@ -63,7 +64,12 @@ class SMSService:
                 position = kwargs.get("position", 1)
                 estimated_wait = kwargs.get("estimated_wait", "a few minutes")
                 result = await notification_service.send_queue_subscription_sms(
-                    customer_phone, customer_name, queue_name, position, estimated_wait
+                    customer_phone,
+                    customer_name,
+                    queue_name,
+                    location_name,
+                    position,
+                    estimated_wait,
                 )
             else:
                 return False, f"Unknown notification type: {notification_type}"

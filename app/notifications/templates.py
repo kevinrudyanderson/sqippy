@@ -178,9 +178,13 @@ Thank you for using Sqipit!
 class SMSTemplates:
     @staticmethod
     def queue_subscription(
-        customer_name: str, queue_name: str, position: int, estimated_wait: str
+        customer_name: str,
+        queue_name: str,
+        location_name: str,
+        position: int,
+        estimated_wait: str,
     ) -> str:
-        return f"Hi {customer_name}! You've joined the queue at {queue_name}. Position: #{position}. Estimated wait: {estimated_wait}. We'll notify you when it's your turn!"
+        return f"Hi {customer_name}! You've joined the queue at {location_name} · {queue_name}. Position: #{position}. Estimated wait: {estimated_wait}. We'll notify you when it's your turn!"
 
     @staticmethod
     def next_in_line(customer_name: str, queue_name: str, service_location: str) -> str:

@@ -41,7 +41,7 @@ class Queue(Base):
 
     # Foreign keys
     service_id = Column(
-        UUID(as_uuid=True), ForeignKey("services.service_id"), nullable=False
+        UUID(as_uuid=True), ForeignKey("services.service_id"), nullable=True
     )
     location_id = Column(
         UUID(as_uuid=True), ForeignKey("locations.location_id"), nullable=False

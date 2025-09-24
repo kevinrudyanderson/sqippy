@@ -357,6 +357,21 @@ async def complete_customer(
 
 
 @router.patch(
+    "/customers/{queue_customer_id}/call", response_model=QueueCustomerResponse
+)
+async def call_customer(
+    queue_customer_id: str,
+    current_user: User = Depends(require_staff_or_admin),
+    queue_service: QueueService = Depends(get_queue_service),
+):
+    """Skip a customer in the queue (Staff/Admin only)"""
+    customer = await queue_service.call_customer_by_id(queue_customer_id)
+    return QueueCustomerResponse(
+        **customer.__dict__, position=None, estimated_wait_time=0
+    )
+
+
+@router.patch(
     "/customers/{queue_customer_id}/cancel", response_model=QueueCustomerResponse
 )
 async def cancel_customer(

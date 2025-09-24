@@ -80,6 +80,7 @@ class NotificationService:
         customer_phone: str,
         customer_name: str,
         queue_name: str,
+        location_name: str,
         position: int,
         estimated_wait: str,
     ) -> NotificationResult:
@@ -91,6 +92,7 @@ class NotificationService:
         message = self.sms_templates.queue_subscription(
             customer_name=customer_name,
             queue_name=queue_name,
+            location_name=location_name,
             position=position,
             estimated_wait=estimated_wait,
         )

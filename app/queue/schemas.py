@@ -11,7 +11,7 @@ from app.queue.models import CustomerStatus, QueueStatus
 class QueueBase(BaseModel):
     name: str
     description: Optional[str] = None
-    service_id: UUID
+    service_id: Optional[UUID] = None
     location_id: UUID
     max_capacity: Optional[int] = None
     estimated_service_time: Optional[int] = None
@@ -161,7 +161,7 @@ class WizardNewService(BaseModel):
 
 
 class WizardServiceConfig(BaseModel):
-    useExisting: bool
+    useExisting: bool = False
     existingServiceId: Optional[UUID] = None
     newService: Optional[WizardNewService] = None
 
@@ -222,8 +222,8 @@ class QueueWizardRequest(BaseModel):
 class QueueWizardResponse(BaseModel):
     queue_id: UUID
     queue_name: str
-    service_id: UUID
-    service_name: str
+    service_id: Optional[UUID] = None
+    service_name: Optional[str] = None
     location_id: UUID
     location_name: str
     created_new_service: bool

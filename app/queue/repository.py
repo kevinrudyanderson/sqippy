@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from typing import List, Optional
 
+from fastapi import HTTPException, status
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
@@ -223,77 +224,202 @@ class QueueCustomerRepository(BaseRepository[QueueCustomer]):
             .first()
         )
 
-        if next_customer:
+        if not next_customer:
+            return None
+
+        # Get organization ID for quota tracking
+        organization_id = (
+            self.db.query(Location.organization_id)
+            .join(Queue, Queue.location_id == Location.location_id)
+            .filter(Queue.queue_id == queue_id)
+            .scalar()
+        )
+
+        # Initialize subscription service for quota tracking
+        subscription_service = SubscriptionService(self.db)
+
+        # Try to send notifications BEFORE changing status
+        email_sent = False
+        sms_sent = False
+        notification_errors = []
+
+        # Try email notification
+        if next_customer.customer_email:
+            try:
+                email_result = await notification_service.send_next_in_line_email(
+                    next_customer.customer_email,
+                    next_customer.customer_name,
+                    next_customer.queue.name,
+                    next_customer.queue.location.name,
+                )
+                if email_result.success:
+                    email_sent = True
+                    subscription_service.track_email_sent(organization_id)
+                else:
+                    notification_errors.append(f"Email failed: {email_result.error}")
+            except Exception as e:
+                notification_errors.append(f"Email failed: {str(e)}")
+
+        # Try SMS notification if phone number is available and organization has SMS credits
+        if next_customer.customer_phone and organization_id:
+            can_send_sms, sms_message = subscription_service.can_send_sms(
+                organization_id
+            )
+
+            if can_send_sms:
+                try:
+                    sms_result = await notification_service.send_next_in_line_sms(
+                        next_customer.customer_phone,
+                        next_customer.customer_name,
+                        next_customer.queue.name,
+                        next_customer.queue.location.name,
+                    )
+                    if sms_result.success:
+                        sms_sent = True
+                        subscription_service.use_sms_credits(organization_id, 1)
+                    else:
+                        notification_errors.append(f"SMS failed: {sms_result.error}")
+                except Exception as e:
+                    notification_errors.append(f"SMS failed: {str(e)}")
+            else:
+                notification_errors.append(f"Cannot send SMS: {sms_message}")
+
+        # Check if at least one notification was sent successfully
+        if not email_sent and not sms_sent:
+            # If customer has no contact info, we can't notify them
+            if not next_customer.customer_email and not next_customer.customer_phone:
+                # Change status anyway - they'll need to check manually
+                next_customer.status = CustomerStatus.IN_SERVICE
+                next_customer.called_at = datetime.now(timezone.utc)
+                self.db.commit()
+                self.db.refresh(next_customer)
+                print(
+                    f"Customer {next_customer.customer_name} called (no contact info - manual check required)"
+                )
+            else:
+                # We have contact info but all notifications failed - raise exception
+                error_message = f"Failed to notify customer {next_customer.customer_name}: {'; '.join(notification_errors)}"
+                print(error_message)
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=error_message,
+                )
+        else:
+            # At least one notification succeeded - update status
             next_customer.status = CustomerStatus.IN_SERVICE
             next_customer.called_at = datetime.now(timezone.utc)
             self.db.commit()
             self.db.refresh(next_customer)
 
-            # Get organization ID for quota tracking
-            organization_id = (
-                self.db.query(Location.organization_id)
-                .join(Queue, Queue.location_id == Location.location_id)
-                .filter(Queue.queue_id == queue_id)
-                .scalar()
-            )
-
-            # Initialize subscription service for quota tracking
-            subscription_service = SubscriptionService(self.db)
-
-            # Send notifications (email and SMS if available)
-            email_sent = False
-            sms_sent = False
-
-            # Send email notification
-            if next_customer.customer_email:
-                try:
-                    email_result = await notification_service.send_next_in_line_email(
-                        next_customer.customer_email,
-                        next_customer.customer_name,
-                        next_customer.queue.name,
-                        next_customer.queue.location.name,
-                    )
-                    if email_result.success:
-                        email_sent = True
-                        # Track email sent
-                        subscription_service.track_email_sent(organization_id)
-                except Exception as e:
-                    print(f"Email notification failed: {e}")
-
-            # Send SMS notification if phone number is available and organization has SMS credits
-            if next_customer.customer_phone and organization_id:
-                can_send_sms, sms_message = subscription_service.can_send_sms(
-                    organization_id
-                )
-
-                if can_send_sms:
-                    try:
-                        sms_result = await notification_service.send_next_in_line_sms(
-                            next_customer.customer_phone,
-                            next_customer.customer_name,
-                            next_customer.queue.name,
-                            next_customer.queue.location.name,
-                        )
-                        if sms_result.success:
-                            sms_sent = True
-                            # Deduct SMS credit from quota
-                            subscription_service.use_sms_credits(organization_id, 1)
-                            print(
-                                f"SMS notification sent successfully to {next_customer.customer_phone}"
-                            )
-                        else:
-                            print(f"SMS notification failed: {sms_result.error}")
-                    except Exception as e:
-                        print(f"SMS notification failed: {e}")
-                else:
-                    print(f"Cannot send SMS: {sms_message}")
-
-            # Log notification status
+            # Log successful notification status
             print(
-                f"Customer {next_customer.customer_name} called. Email: {'✓' if email_sent else '✗'}, SMS: {'✓' if sms_sent else '✗'}"
+                f"Customer {next_customer.customer_name} called successfully. Email: {'✓' if email_sent else '✗'}, SMS: {'✓' if sms_sent else '✗'}"
             )
 
         return next_customer
+
+    async def call_customer_by_id(
+        self, queue_customer_id: str
+    ) -> Optional[QueueCustomer]:
+        customer = self.get(queue_customer_id)
+        if not customer or customer.status != CustomerStatus.WAITING:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Customer not found or not in waiting status",
+            )
+
+        queue_id = customer.queue_id
+
+        # Get organization ID for quota tracking
+        organization_id = (
+            self.db.query(Location.organization_id)
+            .filter(Queue.queue_id == customer.queue_id)
+            .join(Queue, Queue.location_id == Location.location_id)
+            .scalar()
+        )
+
+        # Initialize subscription service for quota tracking
+        subscription_service = SubscriptionService(self.db)
+
+        # Try to send notifications BEFORE changing status
+        email_sent = False
+        sms_sent = False
+        notification_errors = []
+
+        # Try email notification
+        if customer.customer_email:
+            try:
+                email_result = await notification_service.send_next_in_line_email(
+                    customer.customer_email,
+                    customer.customer_name,
+                    customer.queue.name,
+                    customer.queue.location.name,
+                )
+                if email_result.success:
+                    email_sent = True
+                    subscription_service.track_email_sent(organization_id)
+                else:
+                    notification_errors.append(f"Email failed: {email_result.error}")
+            except Exception as e:
+                notification_errors.append(f"Email failed: {str(e)}")
+
+        # Try SMS notification if phone number is available and organization has SMS credits
+        if customer.customer_phone and organization_id:
+            can_send_sms, sms_message = subscription_service.can_send_sms(
+                organization_id
+            )
+
+            if can_send_sms:
+                try:
+                    sms_result = await notification_service.send_next_in_line_sms(
+                        customer.customer_phone,
+                        customer.customer_name,
+                        customer.queue.name,
+                        customer.queue.location.name,
+                    )
+                    if sms_result.success:
+                        sms_sent = True
+                        subscription_service.use_sms_credits(organization_id, 1)
+                    else:
+                        notification_errors.append(f"SMS failed: {sms_result.error}")
+                except Exception as e:
+                    notification_errors.append(f"SMS failed: {str(e)}")
+            else:
+                notification_errors.append(f"Cannot send SMS: {sms_message}")
+
+        # Check if at least one notification was sent successfully
+        if not email_sent and not sms_sent:
+            # If customer has no contact info, we can't notify them
+            if not customer.customer_email and not customer.customer_phone:
+                # Change status anyway - they'll need to check manually
+                customer.status = CustomerStatus.IN_SERVICE
+                customer.called_at = datetime.now(timezone.utc)
+                self.db.commit()
+                self.db.refresh(customer)
+                print(
+                    f"Customer {customer.customer_name} called (no contact info - manual check required)"
+                )
+            else:
+                # We have contact info but all notifications failed - raise exception
+                error_message = f"Failed to notify customer {customer.customer_name}: {'; '.join(notification_errors)}"
+                print(error_message)
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=error_message,
+                )
+        else:
+            # At least one notification succeeded - update status
+            customer.status = CustomerStatus.IN_SERVICE
+            customer.called_at = datetime.now(timezone.utc)
+            self.db.commit()
+            self.db.refresh(customer)
+
+            # Log successful notification status
+            print(
+                f"Customer {customer.customer_name} called successfully. Email: {'✓' if email_sent else '✗'}, SMS: {'✓' if sms_sent else '✗'}"
+            )
+
+        return customer
 
     def complete_customer(self, queue_customer_id: str) -> Optional[QueueCustomer]:
         customer = self.get(queue_customer_id)

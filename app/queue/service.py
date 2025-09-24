@@ -142,6 +142,7 @@ class QueueService:
                         customer.customer_phone,
                         customer.customer_name or "Customer",
                         queue.name,
+                        queue.location.name,
                         "queue_subscription",
                         position=position,
                         estimated_wait=estimated_wait,
@@ -257,6 +258,11 @@ class QueueService:
         # queue = self.get_queue(queue_id)
         return await self.customer_repo.call_next_customer(queue_id)
 
+    async def call_customer_by_id(
+        self, queue_customer_id: str
+    ) -> Optional[QueueCustomer]:
+        return await self.customer_repo.call_customer_by_id(queue_customer_id)
+
     def complete_customer(self, queue_customer_id: str) -> QueueCustomer:
         customer = self.customer_repo.complete_customer(queue_customer_id)
         if not customer:
@@ -348,27 +354,30 @@ class QueueService:
                         detail="Existing service not found",
                     )
             else:
-                if not wizard_data.service.newService:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail="New service data is required when useExisting is false",
-                    )
-                # Create new service (services are now global, no location_id needed)
-                service = Service(
-                    **wizard_data.service.newService.model_dump(),
-                )
-                service = self.service_repo.create(service)
-                created_new_service = True
+                service = None
+            # else:
+            #     if not wizard_data.service.newService:
+            #         raise HTTPException(
+            #             status_code=status.HTTP_400_BAD_REQUEST,
+            #             detail="New service data is required when useExisting is false",
+            #         )
+            #     # Create new service (services are now global, no location_id needed)
+            #     service = Service(
+            #         **wizard_data.service.newService.model_dump(),
+            #     )
+            #     service = self.service_repo.create(service)
+            #     created_new_service = True
 
             # Create queue
             queue = Queue(
-                service_id=service.service_id,
+                service_id=service.service_id if service else None,
                 location_id=location.location_id,
                 name=wizard_data.queue.name,
                 description=wizard_data.queue.description,
                 max_capacity=wizard_data.queue.max_capacity,
                 estimated_service_time=wizard_data.queue.estimated_service_time,
             )
+
             queue = self.queue_repo.create(queue)
 
             # Commit the transaction
@@ -377,8 +386,8 @@ class QueueService:
             return QueueWizardResponse(
                 queue_id=queue.queue_id,
                 queue_name=queue.name,
-                service_id=service.service_id,
-                service_name=service.name,
+                service_id=service.service_id if service else None,
+                service_name=service.name if service else None,
                 location_id=location.location_id,
                 location_name=location.name,
                 created_new_service=created_new_service,
